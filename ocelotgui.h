@@ -2998,6 +2998,24 @@ static const struct keywords strvalues[]=
       {"_UTF8MB4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8MB4}
     };
 
+/* List of options used by connect_set_variable(). */
+#define OPTION_TO_TOKEN2  1 /* assume QString */
+#define OPTION_TO_IS_ENABLE 2
+#define OPTION_TO_INT_TOKEN2 4
+#define OPTION_TO_0 8
+#define OPTION_TO_SPECIAL 16
+#define OPTION_TO_SKIP_ROW_FORM_BOX 32 /* don't show in row_form_box, sometimes dunno why not */
+#define OPTION_TO_QSTRING 64 /* only specified if it's QString but not OPTION_TO_TOKEN2 (as with TEE) */
+
+struct option_keywords {
+  uint16_t keyword_index; /* e.g. TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR */
+  void *option_address;   /* e.g. &ocelot_ca.abort_source_on_error (connect_arguments) */
+  char what_to_do;        /* OPTION_TO_... flags */
+  uint8_t option_sizeof;  /* e.g. sizeof(ocelot_ca.abort_source_on_error) */
+  char width;  /* used in row_form_box */
+  char what_was_done; /* == 1 if changed because option was specified */
+};
+
 /* For talk about fontweightsvalues see "Font comments" */
 
 struct fontweights {
@@ -6134,6 +6152,7 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   const char *tarantool_point_to_data();
+struct option_keywords *point_to_option_keywords(unsigned short int token_keyword_or_offset, char is_keyword_or_offset);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
   int tarantool_get_result_set(int, int);
   QString tarantool_get_messages(int);
@@ -6764,7 +6783,7 @@ enum ocelot_option
   OCELOT_OPTION_36=36,  /* for ocelot_enable_cleartext_plugin */
   OCELOT_OPTION_37=37,  /* for ocelot_opt_can_handle_expired_passwords */
   OCELOT_OPTION_38=38,  /* for ocelot_opt_ssl_enforce */
-  OCELOT_OPTION_39=39,  /* unused. in MySQL, opt_max_allowed_packet */
+  OCELOT_OPTION_39=39,  /* in MySQL, opt_max_allowed_packet */
   OCELOT_OPTION_40=40,  /* unused. in MySQL, opt_net_buffer_length */
   OCELOT_OPTION_41=41,  /* in MySQL, opt_tls_version. + MariaDB recent. */
   OCELOT_OPTION_42=42,  /* in MySQL 5.7.11+, opt_ssl_mode. but MariaDB mysql.h says mysql_opt_zstd_compression_level! */
@@ -6815,6 +6834,7 @@ public:
   typedef const char*     (*tmysql_get_client_info) (void);
 #endif
   typedef const char*     (*tmysql_get_host_info)(MYSQL *);
+  typedef int             (*tmysql_get_option)   (MYSQL *, enum ocelot_option, void *);
   typedef const char*     (*tmysql_info)         (MYSQL *);
   typedef MYSQL*          (*tmysql_init)         (MYSQL *);
 #if (MINGW_MARIADB == 0)
@@ -6920,6 +6940,7 @@ public:
   tmysql_get_client_info t__mysql_get_client_info;
 #endif
   tmysql_get_host_info t__mysql_get_host_info;
+  tmysql_get_option t__mysql_get_option;
   tmysql_info t__mysql_info;
   tmysql_init t__mysql_init;
 #if (MINGW_MARIADB == 0)
@@ -7033,6 +7054,7 @@ void ldbms_mysql_free_result(MYSQL_RES *result);
 const char *ldbms_mysql_get_client_info(void);
 #endif
 const char *ldbms_mysql_get_host_info(MYSQL *mysql);
+int ldbms_mysql_get_option(MYSQL *mysql, enum ocelot_option option, void *arg);
 const char *ldbms_mysql_info(MYSQL *mysql);
 MYSQL *ldbms_mysql_init(MYSQL *mysql);
 #if (MINGW_MARIADB == 0)
