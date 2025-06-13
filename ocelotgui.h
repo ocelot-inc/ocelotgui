@@ -4604,6 +4604,7 @@ struct connect_arguments {
   unsigned short raw;              /* --raw */
   unsigned int opt_reconnect;      /* --reconnect for MYSQL_OPT_RECONNECT */                                           /* --reconnect */
   unsigned short safe_updates;           /* --safe-updates or --i-am-a-dummy */
+  unsigned short sandbox;          /* --sandbox */
   unsigned short secure_auth;             /* --secure_auth for MYSQL_SECURE_AUTH (default=true if version >= 5.6.5) */
   unsigned long int select_limit;  /* --select_limit = n */
   char* server_public_key_as_utf8; /* --server_public_key=s for MYSQL_SERVER_PUBLIC_KEY */

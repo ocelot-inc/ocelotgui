@@ -14642,6 +14642,7 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
   else if (s == QString("R")) slash_token= TOKEN_KEYWORD_PROMPT;
   else if (s == QString("q")) slash_token= TOKEN_KEYWORD_QUIT;
   else if (s == QString("#")) slash_token= TOKEN_KEYWORD_REHASH;
+  else if (s == QString("-")) slash_token= TOKEN_KEYWORD_SANDBOX;
   else if (s == QString(".")) slash_token= TOKEN_KEYWORD_SOURCE;
   else if (s == QString("s")) slash_token= TOKEN_KEYWORD_STATUS;
   else if (s == QString("!")) slash_token= TOKEN_KEYWORD_SYSTEM;
@@ -15491,6 +15492,10 @@ int MainWindow::hparse_f_client_statement()
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
 #endif
+  else if (slash_token == TOKEN_KEYWORD_SANDBOX)
+  {
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET") == 1)
   {
     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;

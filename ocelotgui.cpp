@@ -275,6 +275,7 @@ static struct connect_arguments ocelot_ca {
   .raw= 0,
   .opt_reconnect= 0,
   .safe_updates= 0,
+  .sandbox= 0,
   .secure_auth= 1,
   .select_limit= 0,
   .server_public_key_as_utf8= 0,
@@ -13029,8 +13030,18 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     }
     return EC_1;
   }
+  if (statement_type == TOKEN_KEYWORD_SANDBOX)
+  {
+    ocelot_ca.sandbox= 1;
+    return EC_1;
+  }
   if (statement_type == TOKEN_KEYWORD_SYSTEM)
   {
+    if (ocelot_ca.sandbox == 1)
+    {
+      put_message_in_result("Error: Sandbox");
+      return EC_1;
+    }
     /*
       With mysql client "system ls" would do an ls with system. We use popen not system.
       I don't know whether there is a Windows equivalent; mysql client doesn't support one.
@@ -15950,6 +15961,7 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
     if (s == QString("\\T")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_TEE;
     if (s == QString("\\u")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_USE;
     if (s == QString("\\W")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_WARNINGS;
+    if (s == QString("\\-")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_WARNINGS;
   }
   log("tokens_to_keywords end", 80);
 }
@@ -16010,6 +16022,7 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
   ||  (token == TOKEN_KEYWORD_REFRESH)
 #endif
   ||  (token == TOKEN_KEYWORD_REHASH)
+  ||  (token == TOKEN_KEYWORD_SANDBOX)
   ||  (token == TOKEN_KEYWORD_SOURCE)
   ||  (token == TOKEN_KEYWORD_STATUS)
   ||  (token == TOKEN_KEYWORD_SYSTEM)
@@ -25547,7 +25560,7 @@ option_keywords * MainWindow::point_to_option_keywords(unsigned short int token_
     {TOKEN_KEYWORD_RECONNECT, &ocelot_ca.opt_reconnect, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_reconnect), '\x05', 0},
     {TOKEN_KEYWORD_REPORT_DATA_TRUNCATION, &ocelot_ca.report_data_truncation, OPTION_TO_IS_ENABLE | OPTION_TO_SKIP_ROW_FORM_BOX, sizeof(ocelot_ca.report_data_truncation), '\x05', 0},
     {TOKEN_KEYWORD_SAFE_UPDATES, &ocelot_ca.safe_updates, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.safe_updates), '\x05', 0},  /* Actually this could be "i-am-a-dummy" */
-    /* todo: TOKEN_KEYWORD_SANDBOX */
+    {TOKEN_KEYWORD_SANDBOX, &ocelot_ca.sandbox, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.sandbox), '\x05', 0},  /* Actually this could be "i-am-a-dummy" */
     /* todo: TOKEN_SERVER_SCRIPT_DIR */
     {TOKEN_KEYWORD_SECURE_AUTH, &ocelot_ca.secure_auth, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.secure_auth), '\x05', 0},
     {TOKEN_KEYWORD_SELECT_LIMIT, &ocelot_ca.select_limit, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.select_limit), '\x05', 0},
