@@ -12597,7 +12597,6 @@ QString MainWindow::rect_value(QString input)
   return ccn;
 }
 
-
 /*
  Handle "client statements" -- statements that the client itself executes.
   Possible client statements:
@@ -12682,6 +12681,26 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   sub_token_offsets[i2]= 0;
   sub_token_lengths[i2]= 0;
   sub_token_types[i2]= 0;
+
+  /*
+    Source + System + Tee + Pager+arg are illegal if sandbox. This is new for MariaDB but we don't check that.
+    The mariadb client would say "ERROR: Not allowed in the sandbox mode".
+    We don't support Pager anyway so the check here is only for System and Tee.
+    We only check statements, so --tee could happen.
+    We don't check whether --force is enabled (which would override sandbox).
+    We don't check for plugins, although in theory any plugin could go around a sandbox restriction.
+    Todo: error message should be in ostrings.h and possible in French
+    Todo: Test with MariaDB example:  / * !999999\- enable the sandbox mode * /
+  */
+  if (ocelot_ca.sandbox == 1)
+  {
+    if ((statement_type == TOKEN_KEYWORD_SYSTEM) || (statement_type == TOKEN_KEYWORD_TEE)
+     || (statement_type == TOKEN_KEYWORD_SOURCE))
+    {
+      put_message_in_result("Error: Statement not allowed, sandbox mode");
+      return EC_1;
+    }
+  }
 
   /*
     CONNECT or \r.
@@ -12866,6 +12885,17 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       return EC_1;
     }
     s= connect_stripper(s, true);
+    /* --script_dir=dir is new in MariaDB 12 but we allow regardless: put in front of name; history won't show */
+    if (ocelot_script_dir > "")
+    {
+#ifdef _WIN32
+      if (ocelot_script_dir.right(1) == "\\") s= ocelot_script_dir + s;
+      else s= ocelot_script_dir + "\\" + s;
+#else
+      if (ocelot_script_dir.right(1) == "/") s= ocelot_script_dir + s;
+      else s= ocelot_script_dir + "/" + s;
+#endif
+    }
     is_in_source_statement= true; /* So is_statement_complete() will say statement can end with ; */
     read_file(TOKEN_KEYWORD_SOURCE, s, "");
     is_in_source_statement= false;
@@ -13037,11 +13067,6 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   if (statement_type == TOKEN_KEYWORD_SYSTEM)
   {
-    if (ocelot_ca.sandbox == 1)
-    {
-      put_message_in_result("Error: Sandbox");
-      return EC_1;
-    }
     /*
       With mysql client "system ls" would do an ls with system. We use popen not system.
       I don't know whether there is a Windows equivalent; mysql client doesn't support one.
@@ -25561,7 +25586,7 @@ option_keywords * MainWindow::point_to_option_keywords(unsigned short int token_
     {TOKEN_KEYWORD_REPORT_DATA_TRUNCATION, &ocelot_ca.report_data_truncation, OPTION_TO_IS_ENABLE | OPTION_TO_SKIP_ROW_FORM_BOX, sizeof(ocelot_ca.report_data_truncation), '\x05', 0},
     {TOKEN_KEYWORD_SAFE_UPDATES, &ocelot_ca.safe_updates, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.safe_updates), '\x05', 0},  /* Actually this could be "i-am-a-dummy" */
     {TOKEN_KEYWORD_SANDBOX, &ocelot_ca.sandbox, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.sandbox), '\x05', 0},  /* Actually this could be "i-am-a-dummy" */
-    /* todo: TOKEN_SERVER_SCRIPT_DIR */
+    {TOKEN_KEYWORD_SCRIPT_DIR, &ocelot_script_dir, OPTION_TO_TOKEN2, sizeof(ocelot_script_dir), '\x05', 0},
     {TOKEN_KEYWORD_SECURE_AUTH, &ocelot_ca.secure_auth, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.secure_auth), '\x05', 0},
     {TOKEN_KEYWORD_SELECT_LIMIT, &ocelot_ca.select_limit, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.select_limit), '\x05', 0},
     {TOKEN_KEYWORD_SERVER_PUBLIC_KEY, &ocelot_server_public_key, OPTION_TO_TOKEN2, sizeof(ocelot_server_public_key), '\x05', 0}, /* not available in mysql client */

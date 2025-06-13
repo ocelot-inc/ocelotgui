@@ -5378,6 +5378,7 @@ public:
   QString ocelot_prompt;
   QString ocelot_opt_ssl_verify;
   QString options_files_read;
+  QString ocelot_script_dir;                 /* for --script-dir, new with MariaDB + source */
 
   QList<QString> q_color_list;
   QString q_color_list_name(QString rgb_name);
