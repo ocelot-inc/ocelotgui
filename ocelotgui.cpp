@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: June 12 2025
+   Last modified: June 15 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -290,6 +290,8 @@ static struct connect_arguments ocelot_ca {
   .opt_ssl_cipher_as_utf8= 0,
   .opt_ssl_crl_as_utf8= 0,
   .opt_ssl_crlpath_as_utf8= 0,
+  .opt_ssl_fp_as_utf8= 0,
+  .opt_ssl_fplist_as_utf8= 0,
   .opt_ssl_key_as_utf8= 0,
   .opt_ssl_mode_as_utf8= 0,
   .opt_ssl_verify_server_cert= 0,
@@ -24659,6 +24661,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_opt_ssl_cipher= "";
   ocelot_opt_ssl_crl= "";
   ocelot_opt_ssl_crlpath= "";
+  ocelot_opt_ssl_fp= "";
+  ocelot_opt_ssl_fplist= "";
   ocelot_opt_ssl_key= "";
   ocelot_opt_ssl_mode= "";
   /* ocelot_ca.opt_ssl_verify_server_cert= 0; */ /* already initialized */
@@ -25596,13 +25600,13 @@ option_keywords * MainWindow::point_to_option_keywords(unsigned short int token_
     {TOKEN_KEYWORD_SILENT, &ocelot_ca.silent, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.silent), '\x05', 0},
     {TOKEN_KEYWORD_SSL, &ocelot_opt_ssl, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl), '\x05', 0},
     {TOKEN_KEYWORD_SSL_CA, &ocelot_opt_ssl_ca, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_ca), '\x05', 0},
-    /* todo: TOKEN_KEYWORD_SSL_FP */
-    /* todo: TOKEN_KEYWORD_SSL_FPLIST */
     {TOKEN_KEYWORD_SSL_CAPATH, &ocelot_opt_ssl_capath, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_capath), '\x05', 0},
     {TOKEN_KEYWORD_SSL_CERT, &ocelot_opt_ssl_cert, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_cert), '\x05', 0},
     {TOKEN_KEYWORD_SSL_CIPHER, &ocelot_opt_ssl_cipher, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_cipher), '\x05', 0},
     {TOKEN_KEYWORD_SSL_CRL, &ocelot_opt_ssl_crl, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_crl), '\x05', 0},
     {TOKEN_KEYWORD_SSL_CRLPATH, &ocelot_opt_ssl_crlpath, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_crlpath), '\x05', 0},
+    {TOKEN_KEYWORD_SSL_FP, &ocelot_opt_ssl_fp, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_fp), '\x05', 0},
+    {TOKEN_KEYWORD_SSL_FPLIST, &ocelot_opt_ssl_fplist, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_fplist), '\x05', 0},
     {TOKEN_KEYWORD_SSL_KEY, &ocelot_opt_ssl_key, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_key), '\x05', 0},
     {TOKEN_KEYWORD_SSL_MODE, &ocelot_opt_ssl_mode, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_mode), '\x05', 0},
     {TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT, &ocelot_ca.opt_ssl_verify_server_cert, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_ssl_verify_server_cert), '\x05', 0},
@@ -25994,6 +25998,8 @@ void MainWindow::connect_make_statement()
   if (ocelot_opt_ssl_cipher > "") statement_text= statement_text + "ssl_cipher=" + ocelot_opt_ssl_cipher;
   if (ocelot_opt_ssl_crl > "") statement_text= statement_text + "ssl_crl=" + ocelot_opt_ssl_crl;
   if (ocelot_opt_ssl_crlpath > "") statement_text= statement_text + "ssl_crlpath=" + ocelot_opt_ssl_crlpath;
+  if (ocelot_opt_ssl_fp > "") statement_text= statement_text + "ssl_fp=" + ocelot_opt_ssl_fp;
+  if (ocelot_opt_ssl_fplist > "") statement_text= statement_text + "ssl_fplist=" + ocelot_opt_ssl_fplist;
   if (ocelot_opt_ssl_key > "") statement_text= statement_text + "ssl_key=" + ocelot_opt_ssl_key;
   if (ocelot_opt_ssl_mode > "") statement_text= statement_text + "ssl_mode=" + ocelot_opt_ssl_mode;
   if (ocelot_opt_tls_version > "") statement_text= statement_text + "tls_version=" + ocelot_opt_tls_version;
@@ -26166,6 +26172,8 @@ int options_and_connect(
   }
   if (ocelot_ca.opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_30, ocelot_ca.opt_ssl_crl_as_utf8);
   if (ocelot_ca.opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_31, ocelot_ca.opt_ssl_crlpath_as_utf8);
+  if (ocelot_ca.opt_ssl_fp_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_7001, ocelot_ca.opt_ssl_fp_as_utf8);
+  if (ocelot_ca.opt_ssl_fplist_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_7002, ocelot_ca.opt_ssl_fplist_as_utf8);
   if (opt != 5)
   {
     if (ocelot_ca.opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_21, (char*) &ocelot_ca.opt_ssl_verify_server_cert);
@@ -26310,6 +26318,8 @@ void MainWindow::delete_utf8_copies()
   if (ocelot_ca.opt_ssl_cipher_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_cipher_as_utf8; ocelot_ca.opt_ssl_cipher_as_utf8= 0; }
   if (ocelot_ca.opt_ssl_crl_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_crl_as_utf8; ocelot_ca.opt_ssl_crl_as_utf8= 0; }
   if (ocelot_ca.opt_ssl_crlpath_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_crlpath_as_utf8; ocelot_ca.opt_ssl_crlpath_as_utf8= 0; }
+  if (ocelot_ca.opt_ssl_fp_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_fp_as_utf8; ocelot_ca.opt_ssl_fp_as_utf8= 0; }
+  if (ocelot_ca.opt_ssl_fplist_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_fplist_as_utf8; ocelot_ca.opt_ssl_fplist_as_utf8= 0; }
   if (ocelot_ca.opt_ssl_key_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_key_as_utf8; ocelot_ca.opt_ssl_key_as_utf8= 0; }
   if (ocelot_ca.opt_ssl_mode_as_utf8 != 0) { delete [] ocelot_ca.opt_ssl_mode_as_utf8; ocelot_ca.opt_ssl_mode_as_utf8= 0; }
   if (ocelot_ca.plugin_dir_as_utf8 != 0) { delete [] ocelot_ca.plugin_dir_as_utf8; ocelot_ca.plugin_dir_as_utf8= 0; }
@@ -26388,6 +26398,14 @@ void MainWindow::copy_connect_strings_to_utf8()
   int tmp_opt_ssl_crlpath_len= ocelot_opt_ssl_crlpath.toUtf8().size();
   ocelot_ca.opt_ssl_crlpath_as_utf8= new char[tmp_opt_ssl_crlpath_len + 1];
   memcpy(ocelot_ca.opt_ssl_crlpath_as_utf8, ocelot_opt_ssl_crlpath.toUtf8().constData(), tmp_opt_ssl_crlpath_len + 1);
+
+  int tmp_opt_ssl_fp_len= ocelot_opt_ssl_fp.toUtf8().size();
+  ocelot_ca.opt_ssl_fp_as_utf8= new char[tmp_opt_ssl_fp_len + 1];
+  memcpy(ocelot_ca.opt_ssl_fp_as_utf8, ocelot_opt_ssl_fp.toUtf8().constData(), tmp_opt_ssl_fp_len + 1);
+
+  int tmp_opt_ssl_fplist_len= ocelot_opt_ssl_fplist.toUtf8().size();
+  ocelot_ca.opt_ssl_fplist_as_utf8= new char[tmp_opt_ssl_fplist_len + 1];
+  memcpy(ocelot_ca.opt_ssl_fplist_as_utf8, ocelot_opt_ssl_fplist.toUtf8().constData(), tmp_opt_ssl_fplist_len + 1);
 
   int tmp_opt_ssl_key_len= ocelot_opt_ssl_key.toUtf8().size();
   ocelot_ca.opt_ssl_key_as_utf8= new char[tmp_opt_ssl_key_len + 1];

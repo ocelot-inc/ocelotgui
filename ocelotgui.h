@@ -1761,7 +1761,7 @@ static const struct keywords strvalues[]=
         {"AUTO_REHASH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_REHASH},
         {"AUTO_VERTICAL_OUTPUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT},
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
-      {"BACKGROUND", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BACKGROUND},
+      {"BACKGROUND", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BACKGROUND}, /* only for "lines in background" */
           {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
       {"BAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BAR},
         {"BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BATCH},
@@ -4619,6 +4619,8 @@ struct connect_arguments {
   char* opt_ssl_cipher_as_utf8;    /* --ssl-cipher for MYSQL_OPT_SSL_CIPHER */
   char* opt_ssl_crl_as_utf8;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
   char* opt_ssl_crlpath_as_utf8;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
+  char* opt_ssl_fp_as_utf8;        /* --ssl-fp for MARIADB_OPT_SSL_FP */
+  char* opt_ssl_fplist_as_utf8;    /* --ssl-fplist for MARIADB_OPT_SSL_FP_LIST*/
   char* opt_ssl_key_as_utf8;       /* --ssl-key for MYSQL_OPT_SSL_KEY */
   char* opt_ssl_mode_as_utf8;      /* --ssl-mode for MYSQL_OPT_SSL_MODE */
   unsigned short int opt_ssl_verify_server_cert;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
@@ -5354,6 +5356,8 @@ public:
   QString ocelot_opt_lua;
   QString ocelot_opt_ssl;
   QString ocelot_opt_ssl_ca;
+  QString ocelot_opt_ssl_fp;
+  QString ocelot_opt_ssl_fplist;
   QString ocelot_opt_ssl_capath;
   QString ocelot_opt_ssl_cert;
   QString ocelot_opt_ssl_cipher;
@@ -6805,6 +6809,8 @@ enum ocelot_option
   OCELOT_OPTION_5999=5999,  /* See long comment beginning with the words "Progress Reports". In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
   OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory */
+  OCELOT_OPTION_7001=7001, /* for --ssl-fp */
+  OCELOT_OPTION_7002=7002, /* for --ssl-fplist */
   OCELOT_OPTION_7019=7019  /* unused, in MariaDB, found_rows */
 };
 
