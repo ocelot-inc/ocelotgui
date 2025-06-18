@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: June 17 2025
+   Last modified: June 18 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -622,6 +622,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_ca.log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */  /* Initialization */
+
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
   main_token_max_count= main_token_count_in_all= main_token_count_in_statement= main_token_number= 0;
@@ -15770,7 +15771,7 @@ void MainWindow::initial_asserts()
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
-#define ADDITIONAL_ASSERTS
+
 #ifdef ADDITIONAL_ASSERTS
   //* Test strvalues is ordered by bsearching for every item. */
   // This is commented out i.e. we don't define ADDITIONAL_ASSERTS unless there has been a change to the list */
@@ -26279,25 +26280,31 @@ int options_and_connect(
 
 /*
   Convert string to long.
+  Called from connect_set_variable(), action_file_export_function()
   For numeric connect-related tokens, K means 1024, M means 1024**2, G means 1024**3.
+  But mysql client accepts anything that starts with k or m or g after digits, e.g. --max_join_size=4KKK,
+  so this does the same, but may differ for treatment of 4ABC or 4.0 or other improper values.
   Actually the token might be unsigned int or unsigned long, but this will do.
 */
 long MainWindow::to_long(QString token)
 {
-  QString kmg;
-  QString token_without_kmg;
-  long return_value;
-
-  kmg= token.right(1).toUpper();
+  int position_of_kmg;
+  for (position_of_kmg= 0; position_of_kmg < token.size(); ++position_of_kmg)
+  {
+    QString s= token.mid(position_of_kmg, 1);
+    if ( ((s >= "0") && (s <= "9")) || (s == ".") || (s == "+") || (s == "-")) continue;
+    break;
+  }
+  QString kmg= token.mid(position_of_kmg, -1);
+  QString token_without_kmg= token.left(position_of_kmg);
+  long return_value= token_without_kmg.toLong();
+  kmg= kmg.left(1).toUpper();
   if ((kmg == "K") || (kmg == "M") || (kmg == "G"))
   {
-    token_without_kmg= token.left(token.size() - 1);
-    return_value= token_without_kmg.toLong();
     if (kmg == "K") return_value *= 1024;
     if (kmg == "M") return_value *= 1024 * 1024;
     if (kmg == "G") return_value *= 1024 * 1024 * 1024;
   }
-  else return_value= token.toLong();
   return return_value;
 }
 
