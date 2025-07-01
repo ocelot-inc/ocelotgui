@@ -483,6 +483,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_COMPRESS,
     TOKEN_KEYWORD_COMPRESSED,
     TOKEN_KEYWORD_COMPRESSION,
+    TOKEN_KEYWORD_COMPRESSION_ALGORITHMS,
     TOKEN_KEYWORD_CONCAT,
     TOKEN_KEYWORD_CONCAT_WS,
     TOKEN_KEYWORD_CONDITION,
@@ -679,6 +680,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_GET,
     TOKEN_KEYWORD_GET_FORMAT,
     TOKEN_KEYWORD_GET_LOCK,
+    TOKEN_KEYWORD_GET_SERVER_PUBLIC_KEY,
     TOKEN_KEYWORD_GLENGTH,
     TOKEN_KEYWORD_GLOBAL,
     TOKEN_KEYWORD_GO,
@@ -845,6 +847,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_LITERAL,
     TOKEN_KEYWORD_LN,
     TOKEN_KEYWORD_LOAD,
+    TOKEN_KEYWORD_LOAD_DATA_LOCAL_DIR,
     TOKEN_KEYWORD_LOAD_FILE,
     TOKEN_KEYWORD_LOCAL,
     TOKEN_KEYWORD_LOCALTIME,
@@ -1134,6 +1137,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OPTIMIZER_COSTS,
     TOKEN_KEYWORD_OPTION,
     TOKEN_KEYWORD_OPTIONALLY,
+    TOKEN_KEYWORD_OPTIONAL_RESULTSET_METADATA,
     TOKEN_KEYWORD_OR,
     TOKEN_KEYWORD_ORD,
     TOKEN_KEYWORD_ORDER,
@@ -1150,6 +1154,9 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PARTIAL,
     TOKEN_KEYWORD_PARTITION,
     TOKEN_KEYWORD_PASSWORD,
+    TOKEN_KEYWORD_PASSWORD1,
+    TOKEN_KEYWORD_PASSWORD2,
+    TOKEN_KEYWORD_PASSWORD3,
     TOKEN_KEYWORD_PERCENTILE_CONT,
     TOKEN_KEYWORD_PERCENTILE_DISC,
     TOKEN_KEYWORD_PERCENT_RANK,
@@ -1342,11 +1349,13 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SSL_CIPHER,
     TOKEN_KEYWORD_SSL_CRL,
     TOKEN_KEYWORD_SSL_CRLPATH,
+    TOKEN_KEYWORD_SSL_FIPS_MODE,
     TOKEN_KEYWORD_SSL_FP,
     TOKEN_KEYWORD_SSL_FPLIST,
     TOKEN_KEYWORD_SSL_KEY,
     TOKEN_KEYWORD_SSL_MODE,
     TOKEN_KEYWORD_SSL_PASSPHRASE,
+    TOKEN_KEYWORD_SSL_SESSION_DATA,
     TOKEN_KEYWORD_SSL_VERIFY,
     TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT,
     TOKEN_KEYWORD_START,
@@ -1494,6 +1503,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_TINYBLOB,
     TOKEN_KEYWORD_TINYINT,
     TOKEN_KEYWORD_TINYTEXT,
+    TOKEN_KEYWORD_TLS_CIPHERSUITES,
+    TOKEN_KEYWORD_TLS_SNI_SERVERNAME,
     TOKEN_KEYWORD_TLS_VERSION,
     TOKEN_KEYWORD_TO,
     TOKEN_KEYWORD_TOUCHES,
@@ -1592,6 +1603,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_YEARWEEK,
     TOKEN_KEYWORD_YEAR_MONTH,
     TOKEN_KEYWORD_ZEROFILL,
+    TOKEN_KEYWORD_ZSTD_COMPRESSION_LEVEL,
     TOKEN_KEYWORD__ARMSCII8,
     TOKEN_KEYWORD__ASCII,
     TOKEN_KEYWORD__BIG5,
@@ -1689,7 +1701,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1296
+#define KEYWORD_LIST_SIZE 1308
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1847,6 +1859,7 @@ static const struct keywords strvalues[]=
   {"COMPRESS",  FLAG_VERSION_OPTION, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COMPRESS}, /* both option and function */
   {"COMPRESSED", 0, 0, TOKEN_KEYWORD_COMPRESSED},
   {"COMPRESSION", 0, 0, TOKEN_KEYWORD_COMPRESSION},
+  {"COMPRESSION_ALGORITHMS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COMPRESSION_ALGORITHMS},
   {"CONCAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONCAT},
   {"CONCAT_WS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONCAT_WS},
   {"CONDITION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CONDITION},
@@ -2042,6 +2055,7 @@ static const struct keywords strvalues[]=
   {"GET", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_GET},
   {"GET_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_FORMAT},
   {"GET_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_LOCK},
+  {"GET_SERVER_PUBLIC_KEY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_GET_SERVER_PUBLIC_KEY},
   {"GLENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GLENGTH}, /* deprecated in MySQL 5.7.6 */
   {"GLOBAL", 0, 0, TOKEN_KEYWORD_GLOBAL},
   {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* ocelotgui keyword */
@@ -2207,6 +2221,7 @@ static const struct keywords strvalues[]=
   {"LITERAL", 0, 0, TOKEN_KEYWORD_LITERAL}, /* for format rule */
   {"LN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LN},
   {"LOAD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOAD},
+  {"LOAD_DATA_LOCAL_DIR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_LOAD_DATA_LOCAL_DIR},
   {"LOAD_FILE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOAD_FILE},
   {"LOCAL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_LOCAL},
   {"LOCALTIME", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCALTIME},
@@ -2495,6 +2510,7 @@ static const struct keywords strvalues[]=
   {"OPTIMIZER_COSTS", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_OPTIMIZER_COSTS},
   {"OPTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTION},
   {"OPTIONALLY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIONALLY},
+  {"OPTIONAL_RESULTSET_METADATA", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OPTIONAL_RESULTSET_METADATA},
   {"OR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_OR},
   {"ORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ORD},
   {"ORDER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ORDER},
@@ -2511,6 +2527,9 @@ static const struct keywords strvalues[]=
   {"PARTIAL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_PARTIAL},
   {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
   {"PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_OPTION, TOKEN_KEYWORD_PASSWORD}, /* deprecated in MySQL 5.7.6 */
+  {"PASSWORD1", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PASSWORD1},
+  {"PASSWORD2", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PASSWORD2},
+  {"PASSWORD3", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PASSWORD3},
   {"PERCENTILE_CONT", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_CONT}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
   {"PERCENTILE_DISC", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_DISC}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
   {"PERCENT_RANK", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_PERCENT_RANK},
@@ -2703,11 +2722,13 @@ static const struct keywords strvalues[]=
   {"SSL_CIPHER", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CIPHER},
   {"SSL_CRL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CRL},
   {"SSL_CRLPATH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CRLPATH},
+  {"SSL_FIPS_MODE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FIPS_MODE},
   {"SSL_FP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FP},
   {"SSL_FPLIST", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FPLIST},
   {"SSL_KEY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_KEY},
   {"SSL_MODE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_MODE},
   {"SSL_PASSPHRASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_PASSPHRASE},
+  {"SSL_SESSION_DATA", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_SESSION_DATA},
   {"SSL_VERIFY", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_SSL_VERIFY},
   {"SSL_VERIFY_SERVER_CERT", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT},
   {"START", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_START},
@@ -2855,6 +2876,8 @@ static const struct keywords strvalues[]=
   {"TINYBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYBLOB},
   {"TINYINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYINT},
   {"TINYTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYTEXT},
+  {"TLS_CIPHERSUITES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TLS_CIPHERSUITES},
+  {"TLS_SNI_SERVERNAME", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TLS_SNI_SERVERNAME},
   {"TLS_VERSION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TLS_VERSION},
   {"TO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TO},
   {"TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TOUCHES}, /* deprecated in MySQL 5.7.6 */
@@ -2953,6 +2976,7 @@ static const struct keywords strvalues[]=
   {"YEARWEEK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_YEARWEEK},
   {"YEAR_MONTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_YEAR_MONTH},
   {"ZEROFILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ZEROFILL},
+  {"ZSTD_COMPRESSION_LEVEL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_ZSTD_COMPRESSION_LEVEL},
   {"_ARMSCII8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__ARMSCII8},
   {"_ASCII", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__ASCII},
   {"_BIG5", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__BIG5},
@@ -3011,8 +3035,9 @@ struct option_keywords {
   void *option_address;   /* e.g. &ocelot_ca.abort_source_on_error (connect_arguments) */
   char what_to_do;        /* OPTION_TO_... flags */
   uint8_t option_sizeof;  /* e.g. sizeof(ocelot_ca.abort_source_on_error) */
-  char width;  /* used in row_form_box */
-  char what_was_done; /* == 1 if changed because option was specified */
+  uint8_t width;  /* used in row_form_box */
+  char flags; /* e.g. USED_FLAG if changed because option was specified */
+  char **option_as_utf8; /* if *option_address is QString, this might have utf8 char* in ocelot_ca */
 };
 
 /* For talk about fontweightsvalues see "Font comments" */
@@ -4558,6 +4583,7 @@ struct connect_arguments {
   unsigned short column_type_info;        /* --column_type_info */
   unsigned short comments;               /* --comments */
   unsigned short opt_compress;           /* --compress for MYSQL_OPT_COMPRESS */
+  char *opt_compression_algorithms_as_utf8;
   unsigned long int opt_connect_timeout;  /* --connect_timeout = n for MYSQL_OPT_CONNECT_TIMEOUT */
   /* QString debug */                               /* --debug[=s] */
   unsigned short debug_check;             /* --debug_check */
@@ -4571,6 +4597,7 @@ struct connect_arguments {
   unsigned short enable_cleartext_plugin;  /* --enable_cleartext_plugin for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
   /* QString execute */               /* --execute=s */
   unsigned short force;     /* --force */
+  unsigned short get_server_public_key;
   unsigned short help;      /* --help */
   unsigned char history_hist_file_is_open; /* was bool */
   unsigned char history_hist_file_is_copied; /* was bool */
@@ -4580,6 +4607,7 @@ struct connect_arguments {
   unsigned short ignore_spaces;  /* --ignore_spaces */
   /* QString ld_run_path */                /* --ld_run_path=s */
   unsigned short line_numbers;   /* --line_numbers */
+  char* load_data_local_dir_as_utf8;
   unsigned short opt_local_infile;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
   /* QString login_path */            /* --login_path=s */
   unsigned short int log_level;          /* --ocelot_log_level */
@@ -4592,7 +4620,10 @@ struct connect_arguments {
   unsigned short no_defaults;            /* --no_defaults */
   /* QString dbms */
   unsigned short one_database;           /* --one-database */
+  unsigned short opt_optional_resultset_metadata;
   /* QString pager */                              /* --pager[=s] */
+  char* password2_as_utf8;
+  char* password3_as_utf8;
   unsigned short pipe;                   /* --pipe */
   char* plugin_dir_as_utf8;        /* --plugin_dir=s for MYSQL_PLUGIN_DIR */
   unsigned short print_defaults;   /* --print_defaults */
@@ -4618,15 +4649,19 @@ struct connect_arguments {
   char* opt_ssl_cipher_as_utf8;    /* --ssl-cipher for MYSQL_OPT_SSL_CIPHER */
   char* opt_ssl_crl_as_utf8;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
   char* opt_ssl_crlpath_as_utf8;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
+  char* opt_ssl_fips_mode_as_utf8;
   char* opt_ssl_fp_as_utf8;        /* --ssl-fp for MARIADB_OPT_SSL_FP */
   char* opt_ssl_fplist_as_utf8;    /* --ssl-fplist for MARIADB_OPT_SSL_FP_LIST*/
   char* opt_ssl_key_as_utf8;       /* --ssl-key for MYSQL_OPT_SSL_KEY */
   char* opt_ssl_mode_as_utf8;      /* --ssl-mode for MYSQL_OPT_SSL_MODE */
   char* opt_ssl_passphrase_as_utf8;/* --ssl-passphrase for MYSQL_OPT_SSL_PASSPHRASE */
+  char* ssl_session_data_as_utf8;
   unsigned short int opt_ssl_verify_server_cert;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
   unsigned short syslog;           /* --syslog (5.7) */
   unsigned short table;            /* --table */
   unsigned char history_tee_file_is_open; /* was bool */     /* --tee for tee  ... arg=history_tee_file_name*/
+  char* tls_ciphersuites_as_utf8;
+  char* tls_sni_servername_as_utf8;
   char* opt_tls_version_as_utf8;   /* --tls-version for MYSQL_OPT_TLS_VERSION */
   unsigned short unbuffered;       /* --unbuffered */
   unsigned short verbose;          /* --verbose */
@@ -4634,6 +4669,7 @@ struct connect_arguments {
   unsigned short vertical;               /* --vertical */
   unsigned short wait;                   /* --wait ... actually this does nothing */
   unsigned short xml;                    /* --xml */
+  unsigned short zstd_compression_level;
   unsigned short bar;                    /* unused */
   unsigned short line;                   /* unused */
   unsigned short pie;                    /* unused */
@@ -5094,6 +5130,8 @@ struct explorer_items_fk {   /* For ERDiagram */
 /* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */
 #define READONLY_FLAG 1
 #define NUM_FLAG 32768
+#define PASSWORD_FLAG 2
+#define USED_FLAG 4
 
 /*
   Most ocelot_ variables are in ocelotgui.cpp but if one is required by ocelotgui.h, say so here.
@@ -5384,7 +5422,16 @@ public:
   QString ocelot_opt_ssl_verify;
   QString options_files_read;
   QString ocelot_script_dir;                 /* for --script-dir, new with MariaDB + source */
-
+#if (FLAG_VERSION_MYSQL_8_ALL != 0)
+  QString ocelot_compression_algorithms;
+  QString ocelot_load_data_local_dir;
+  QString ocelot_password2;
+  QString ocelot_password3;
+  QString ocelot_ssl_fips_mode;
+  QString ocelot_ssl_session_data;
+  QString ocelot_tls_ciphersuites;
+  QString ocelot_tls_sni_servername;
+#endif
   QList<QString> q_color_list;
   QString q_color_list_name(QString rgb_name);
   QString qt_color(QString);
@@ -5942,6 +5989,7 @@ public:
 
 public slots: /* todo: check if should be private */
   void action_settings_statement_edit_widget_text_changed(int,int,int);
+  void initialize_ocelot_ca();
   void initialize_after_main_window_show();
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_debug_timer_status();
@@ -6295,6 +6343,8 @@ public:
   QString tarantool_table_name;
   QString tarantool_column_name;
 
+  int bounding_rect_width(QFont qf, QString name);
+  int bounding_rect_height(QFont qf, QString name);
 };
 
 
@@ -6487,7 +6537,7 @@ public:
 Row_form_box(int column_count, QString *row_form_label,
              int *row_form_type,
              int *row_form_is_password, QString *row_form_data,
-//             QString *row_form_width,
+             uint8_t *row_form_width,
              QString row_form_title, QString row_form_message,
              MainWindow *parent);
 QSize sizeHint() const;
@@ -6749,6 +6799,9 @@ public:
 #ifndef LDBMS_H
 #define LDBMS_H
 
+/*
+  7 items "skipped in MySQL 8.0" were removed in an incompatible ABI change by MySQL not MariaDB
+*/
 enum ocelot_option
 {
   OCELOT_OPTION_0=0, /* for ocelot_opt_connect_timeout */
@@ -6765,14 +6818,18 @@ enum ocelot_option
   OCELOT_OPTION_11=11,  /* for ocelot_opt_read_timeout */
   OCELOT_OPTION_12=12,  /* for ocelot_opt_write_timeout */
   OCELOT_OPTION_13=13,  /* unused. in MySQL, opt_use_result */
-  OCELOT_OPTION_14=14,  /* unused. in MySQL, use_remote_connection */
-  OCELOT_OPTION_15=15,  /* unused. in MySQL, use_embedded_connection */
-  OCELOT_OPTION_16=16,  /* unused. in MySQL, opt_guess_connection */
-  OCELOT_OPTION_17=17,  /* unused. in MySQL, set_client_ip */
-  OCELOT_OPTION_18=18,  /* for ocelot_secure_auth */
+
+  OCELOT_OPTION_14=14,  /* unused. was use_remote_connection. skipped in MySQL 8.0 */
+  OCELOT_OPTION_15=15,  /* unused. was use_embedded_connection. skipped in MySQL 8.0 */
+  OCELOT_OPTION_16=16,  /* unused. was opt_guess_connection. skipped in MySQL 8.0 */
+  OCELOT_OPTION_17=17,  /* unused. was set_client_ip. skipped in MySQL 8.0 */
+  OCELOT_OPTION_18=18,  /* for ocelot_secure_auth. skipped in MySQL 8.0 */
+
   OCELOT_OPTION_19=19,  /* for ocelot_report_data_truncation */
   OCELOT_OPTION_20=20,  /* for ocelot_opt_reconnect */
-  OCELOT_OPTION_21=21,  /* ocelot_opt_ssl_verify_server_cert */
+
+  OCELOT_OPTION_21=21,  /* ocelot_opt_ssl_verify_server_cert. skipped in MySQL 8.0 */
+
   OCELOT_OPTION_22=22,  /* ocelot_plugin_dir_as_utf8 */
   OCELOT_OPTION_23=23,  /* for ocelot_default_auth_as_utf8 */
   OCELOT_OPTION_24=24,  /* for ocelot_opt_bind_as_utf8 */
@@ -6789,30 +6846,33 @@ enum ocelot_option
   OCELOT_OPTION_35=35,  /* for ocelot_server_public_key_as_utf8 */
   OCELOT_OPTION_36=36,  /* for ocelot_enable_cleartext_plugin */
   OCELOT_OPTION_37=37,  /* for ocelot_opt_can_handle_expired_passwords */
-  OCELOT_OPTION_38=38,  /* for ocelot_opt_ssl_enforce */
+  OCELOT_OPTION_38=38,  /* for ocelot_opt_ssl_enforce. skipped in MySQL 8.0 */
   OCELOT_OPTION_39=39,  /* in MySQL, opt_max_allowed_packet */
   OCELOT_OPTION_40=40,  /* unused. in MySQL, opt_net_buffer_length */
   OCELOT_OPTION_41=41,  /* in MySQL, opt_tls_version. + MariaDB recent. */
   OCELOT_OPTION_42=42,  /* in MySQL 5.7.11+, opt_ssl_mode. but MariaDB mysql.h says mysql_opt_zstd_compression_level! */
   /* New MySQL options not covered yet:
-    MYSQL_OPT_GET_SERVER_PUBLIC_KEY,
-    MYSQL_OPT_RETRY_COUNT,
-    MYSQL_OPT_OPTIONAL_RESULTSET_METADATA,
-    MYSQL_OPT_SSL_FIPS_MODE,
-    MYSQL_OPT_TLS_CIPHERSUITES,
-    MYSQL_OPT_COMPRESSION_ALGORITHMS,
-    MYSQL_OPT_ZSTD_COMPRESSION_LEVEL,
-    MYSQL_OPT_LOAD_DATA_LOCAL_DIR,
-    MYSQL_OPT_USER_PASSWORD,
-    MYSQL_OPT_SSL_SESSION_DATA,
-    MYSQL_OPT_TLS_SNI_SERVERNAME
+    documented in https://dev.mysql.com/doc/c-api/9.3/en/mysql-options.html
+    correspondences: https://dev.mysql.com/doc/refman/9.3/en/mysql-command-options.html
   */
+  OCELOT_OPTION_43=36, /* MYSQL_OPT_GET_SERVER_PUBLIC_KEY,       --get-server-public-key */
+  OCELOT_OPTION_44=37, /*  MYSQL_OPT_RETRY_COUNT,                 ? something to do with ndb cluster? */
+  OCELOT_OPTION_45=38, /*  MYSQL_OPT_OPTIONAL_RESULTSET_METADATA, --column-type-info???? */
+  OCELOT_OPTION_46=39, /*  MYSQL_OPT_SSL_FIPS_MODE,               --ssl-fips-mode */
+  OCELOT_OPTION_47=40, /*  MYSQL_OPT_TLS_CIPHERSUITES,            --tls-ciphersuites */
+  OCELOT_OPTION_48=41, /*  MYSQL_OPT_COMPRESSION_ALGORITHMS,      --compression-algorithms */
+  OCELOT_OPTION_49=42, /*  MYSQL_OPT_ZSTD_COMPRESSION_LEVEL,      --zstd-compression-level */
+  OCELOT_OPTION_50=43, /*  MYSQL_OPT_LOAD_DATA_LOCAL_DIR,         --load-data-local-dir */
+  OCELOT_OPTION_51=44, /*  MYSQL_OPT_USER_PASSWORD,               mysql_options4() --password1|2|3 */
+  OCELOT_OPTION_52=45, /*  MYSQL_OPT_SSL_SESSION_DATA,            --ssl-session-data */
+  OCELOT_OPTION_53=46, /*  MYSQL_OPT_TLS_SNI_SERVERNAME           --tls-sni-servername */
   OCELOT_OPTION_5999=5999,  /* See long comment beginning with the words "Progress Reports". In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
   OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory */
   OCELOT_OPTION_7001=7001, /* for --ssl-fp. The 7000s are for MariaDB Connector/C */
   OCELOT_OPTION_7002=7002, /* for --ssl-fplist */
   OCELOT_OPTION_7003=7003, /* for --ssl-passphrase */
+  OCELOT_OPTION_7017=7017, /* schema */
   OCELOT_OPTION_7019=7019  /* unused, in MariaDB, found_rows */
 };
 
@@ -6856,6 +6916,7 @@ public:
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
   typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
   typedef int             (*tmysql_options)      (MYSQL *, enum ocelot_option, const void *);
+  typedef int             (*tmysql_options4)     (MYSQL *, enum ocelot_option, const void *, const void *);
   typedef int             (*tmysql_ping)         (MYSQL *);
   typedef int             (*tmysql_query)        (MYSQL *, const char *);
   typedef MYSQL*          (*tmysql_real_connect) (MYSQL *, const char *,
@@ -6962,6 +7023,7 @@ public:
   tmysql_num_fields t__mysql_num_fields;
   tmysql_num_rows t__mysql_num_rows;
   tmysql_options t__mysql_options;
+  tmysql_options4 t__mysql_options4;
   tmysql_ping t__mysql_ping;
   tmysql_query t__mysql_query;
   tmysql_real_connect t__mysql_real_connect;
@@ -7076,6 +7138,7 @@ int ldbms_mysql_next_result(MYSQL *mysql);
 unsigned int ldbms_mysql_num_fields(MYSQL_RES *result);
 my_ulonglong ldbms_mysql_num_rows(MYSQL_RES *result);
 int ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const void *arg);
+int ldbms_mysql_options4(MYSQL *mysql, enum ocelot_option option, const void *arg1, const void *arg2);
 int ldbms_mysql_ping(MYSQL *mysql);
 int ldbms_mysql_query(MYSQL *mysql, const char *stmt_str);
 MYSQL *ldbms_mysql_real_connect(MYSQL *mysql, const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long client_flag);
@@ -8389,8 +8452,6 @@ QRect next_available_rect(QRect last_rect, QRect this_rect, int t);
 QRect next_available_rect_2(QRect last_rect, QRect this_rect, int i_direction);
 QRect next_available_rect_3(QRect last_rect, QRect this_rect, int i_direction);
 bool is_available_rect(int x, int y);
-int bounding_rect_width(QFont qf, QString name);
-int bounding_rect_height(QFont qf, QString name);
 public:
 erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query);
 private:
