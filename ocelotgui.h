@@ -142,12 +142,36 @@ typedef struct
 
 /* Copy of https://github.com/pgfindlib/pgfindlib.h */
 #ifndef OCELOT_PGFINDLIB
-#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
-#define OCELOT_PGFINDLIB 1
-#include "pgfindlib.h"
-#endif
+  #if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
+    #define OCELOT_PGFINDLIB 1
+    #include "pgfindlib.h"
+  #else
+    #define OCELOT_PGFINDLIB 0
+  #endif
 #else
-#define OCELOT_PGFINDLIB 0
+  #define OCELOT_PGFINDLIB 0
+#endif
+
+#ifndef OCELOT_PGOPTIONFILES
+  #if defined(OCELOT_OS_LINUX)
+    #define OCELOT_PGOPTIONFILES 1
+  #else
+    #define OCELOT_PGOPTIONFILES 0
+  #endif
+#else
+  #define OCELOT_PGOPTIONFILES 0
+#endif
+
+/* If we have a list inside a \0-terminated string, we should have a delimiter that won't be in a list element. */
+#ifndef OCELOT_DELIMITER
+#define OCELOT_DELIMITER "\n"
+#endif
+
+#define DBMS_MYSQL 1
+#define DBMS_MARIADB 2
+#define DBMS_TARANTOOL 3
+#ifndef OCELOT_DBMS_DEFAULT
+#define OCELOT_DBMS_DEFAULT DBMS_MYSQL
 #endif
 
 /*
@@ -179,9 +203,6 @@ typedef struct
         So we have to distinguish by checking what's being connected as well as what flag value matches.
         For example in hparse.h we say things like "if ((hparse_dbms_mask & flag_version) == 0) return 0;"
 */
-#define DBMS_MYSQL 1
-#define DBMS_MARIADB 2
-#define DBMS_TARANTOOL 3
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      1
 #define FLAG_VERSION_MYSQL_5_7      2
@@ -312,7 +333,7 @@ typedef struct
 /*
   When building Qt + libmariadb.a on Windows we have to exclude mysql_server_end + mysql_library_end + mysql_get_client_info.
   We don't have Q_OS_WIN32 yet but this should establish we're calling from MinGW-64 with 32-bit.
-  If we can't call mysql_get-client_info then we don't really know Connector/C version number so we'll assume 3.3.8.
+  If we can't call mysql_get_client_info then we don't really know Connector/C version number so we'll assume 3.3.8.
    #I've seen a claim that this is unnecessary and I can use .lib as long as it's 32-bit, but I didn't try that.
    #Read https://stackoverflow.com/questions/11793370/how-can-i-convert-a-vsts-lib-to-a-mingw-a
    #Read "generating an import library for a dll"
@@ -410,7 +431,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_BINARY_DOUBLE,
     TOKEN_KEYWORD_BINARY_FLOAT,
     TOKEN_KEYWORD_BINARY_MODE,
-    TOKEN_KEYWORD_BIND,
     TOKEN_KEYWORD_BIND_ADDRESS,
     TOKEN_KEYWORD_BINLOG,
     TOKEN_KEYWORD_BINLOG_ADMIN,
@@ -743,6 +763,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_INT4,
     TOKEN_KEYWORD_INT8,
     TOKEN_KEYWORD_INTEGER,
+    TOKEN_KEYWORD_INTERACTIVE_TIMEOUT,
     TOKEN_KEYWORD_INTERIORRINGN,
     TOKEN_KEYWORD_INTERSECT,
     TOKEN_KEYWORD_INTERSECTS,
@@ -1260,6 +1281,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_RESTRICT,
     TOKEN_KEYWORD_RETURN,
     TOKEN_KEYWORD_RETURNS,
+    TOKEN_KEYWORD_RETURN_FOUND_ROWS,
     TOKEN_KEYWORD_REVERSE,
     TOKEN_KEYWORD_REVOKE,
     TOKEN_KEYWORD_RIGHT,
@@ -1349,9 +1371,11 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SSL_CIPHER,
     TOKEN_KEYWORD_SSL_CRL,
     TOKEN_KEYWORD_SSL_CRLPATH,
+    TOKEN_KEYWORD_SSL_ENFORCE,
     TOKEN_KEYWORD_SSL_FIPS_MODE,
     TOKEN_KEYWORD_SSL_FP,
     TOKEN_KEYWORD_SSL_FPLIST,
+    TOKEN_KEYWORD_SSL_FP_LIST,
     TOKEN_KEYWORD_SSL_KEY,
     TOKEN_KEYWORD_SSL_MODE,
     TOKEN_KEYWORD_SSL_PASSPHRASE,
@@ -1701,7 +1725,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1308
+#define KEYWORD_LIST_SIZE 1311
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1790,7 +1814,6 @@ static const struct keywords strvalues[]=
   {"BINARY_DOUBLE", 0, 0, TOKEN_KEYWORD_BINARY_DOUBLE},
   {"BINARY_FLOAT", 0, 0, TOKEN_KEYWORD_BINARY_FLOAT},
   {"BINARY_MODE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BINARY_MODE},
-  {"BIND", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_BIND},
   {"BIND_ADDRESS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BIND_ADDRESS},
   {"BINLOG", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BINLOG},
   {"BINLOG_ADMIN", 0, 0, TOKEN_KEYWORD_BINLOG_ADMIN},
@@ -2117,6 +2140,7 @@ static const struct keywords strvalues[]=
   {"INT4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT4},
   {"INT8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT8},
   {"INTEGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTEGER},
+  {"INTERACTIVE_TIMEOUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_INTERACTIVE_TIMEOUT},
   {"INTERIORRINGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERIORRINGN}, /* deprecated in MySQL 5.7.6 */
   {"INTERSECT", FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_INTERSECT},
   {"INTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERSECTS}, /* deprecated in MySQL 5.7.6 */
@@ -2633,6 +2657,7 @@ static const struct keywords strvalues[]=
   {"RESTRICT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESTRICT},
   {"RETURN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_RETURN},
   {"RETURNS", 0, 0, TOKEN_KEYWORD_RETURNS},
+  {"RETURN_FOUND_ROWS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_RETURN_FOUND_ROWS},
   {"REVERSE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REVERSE},
   {"REVOKE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REVOKE},
   {"RIGHT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RIGHT},
@@ -2722,9 +2747,11 @@ static const struct keywords strvalues[]=
   {"SSL_CIPHER", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CIPHER},
   {"SSL_CRL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CRL},
   {"SSL_CRLPATH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_CRLPATH},
+  {"SSL_ENFORCE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_ENFORCE},
   {"SSL_FIPS_MODE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FIPS_MODE},
   {"SSL_FP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FP},
   {"SSL_FPLIST", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FPLIST},
+  {"SSL_FP_LIST", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_FP_LIST}, /* alternate term for ssl_fplist */
   {"SSL_KEY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_KEY},
   {"SSL_MODE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_MODE},
   {"SSL_PASSPHRASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SSL_PASSPHRASE},
@@ -3031,6 +3058,7 @@ static const struct keywords strvalues[]=
 #define OPTION_TO_QSTRING 64 /* only specified if it's QString but not OPTION_TO_TOKEN2 (as with TEE) */
 
 struct option_keywords {
+  uint16_t option;
   uint16_t keyword_index; /* e.g. TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR */
   void *option_address;   /* e.g. &ocelot_ca.abort_source_on_error (connect_arguments) */
   char what_to_do;        /* OPTION_TO_... flags */
@@ -4598,6 +4626,7 @@ struct connect_arguments {
   /* QString execute */               /* --execute=s */
   unsigned short force;     /* --force */
   unsigned short get_server_public_key;
+  unsigned short interactive_timeout; /* --interactive_timeout */
   unsigned short help;      /* --help */
   unsigned char history_hist_file_is_open; /* was bool */
   unsigned char history_hist_file_is_copied; /* was bool */
@@ -4622,6 +4651,7 @@ struct connect_arguments {
   unsigned short one_database;           /* --one-database */
   unsigned short opt_optional_resultset_metadata;
   /* QString pager */                              /* --pager[=s] */
+  char* password1_as_utf8;
   char* password2_as_utf8;
   char* password3_as_utf8;
   unsigned short pipe;                   /* --pipe */
@@ -4632,7 +4662,8 @@ struct connect_arguments {
   unsigned char prompt_is_default; /* was bool */
   unsigned short quick;            /* --quick */
   unsigned short raw;              /* --raw */
-  unsigned int opt_reconnect;      /* --reconnect for MYSQL_OPT_RECONNECT */                                           /* --reconnect */
+  unsigned int opt_reconnect;      /* --reconnect for MYSQL_OPT_RECONNECT */
+  unsigned short opt_return_found_rows; /* --return-found-rows for MARIADB_OPT_FOUND_ROWS */
   unsigned short safe_updates;           /* --safe-updates or --i-am-a-dummy */
   unsigned short sandbox;          /* --sandbox */
   unsigned short secure_auth;             /* --secure_auth for MYSQL_SECURE_AUTH (default=true if version >= 5.6.5) */
@@ -4649,6 +4680,7 @@ struct connect_arguments {
   char* opt_ssl_cipher_as_utf8;    /* --ssl-cipher for MYSQL_OPT_SSL_CIPHER */
   char* opt_ssl_crl_as_utf8;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
   char* opt_ssl_crlpath_as_utf8;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
+  unsigned short int opt_ssl_enforce;  /* --ssl-enforce for MYSQL_OPT_SSL_ENFORCE */
   char* opt_ssl_fips_mode_as_utf8;
   char* opt_ssl_fp_as_utf8;        /* --ssl-fp for MARIADB_OPT_SSL_FP */
   char* opt_ssl_fplist_as_utf8;    /* --ssl-fplist for MARIADB_OPT_SSL_FP_LIST*/
@@ -4680,7 +4712,7 @@ struct connect_arguments {
   */
   unsigned short opt_can_handle_expired_passwords;
   /* Some items we allow, which are not available in mysql client */
-  char* opt_bind_as_utf8;              /* for MYSQL_OPT_BIND */
+  char* opt_bind_address_as_utf8;              /* for MYSQL_OPT_BIND */
   char* opt_connect_attr_delete_as_utf8;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
   unsigned short int opt_connect_attr_reset; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
   char* read_default_file_as_utf8; /* for MYSQL_READ_DEFAULT_FILE */
@@ -5384,8 +5416,7 @@ public:
   QString ocelot_unix_socket;
   QString ocelot_default_auth;
   QString ocelot_init_command;
-  QString ocelot_opt_bind;
-  QString ocelot_bind_address; /* Todo: check: is this the same as ocelot_opt_bind? */
+  QString ocelot_bind_address;
   QString ocelot_opt_connect_attr_delete;
   QString ocelot_debug;
   QString ocelot_execute;
@@ -5425,6 +5456,7 @@ public:
 #if (FLAG_VERSION_MYSQL_8_ALL != 0)
   QString ocelot_compression_algorithms;
   QString ocelot_load_data_local_dir;
+  QString ocelot_password1;
   QString ocelot_password2;
   QString ocelot_password3;
   QString ocelot_ssl_fips_mode;
@@ -6077,6 +6109,9 @@ private:
 //                       char *tmp_plugin_dir, char *tmp_default_auth, char *unix_socket, unsigned int connection_number);
 
   void connect_mysql_options_2(int w_argc, char *argv[]);
+#if (OCELOT_PGOPTIONFILES == 1)
+  int option_files(QByteArray soname, char *my_cnf_files, const char *home);
+#endif
   void connect_read_command_line(int argc, char *argv[]);
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
   QStringList my_cnf_groups_list();
@@ -6153,6 +6188,7 @@ private:
 public:
   void statement_edit_widget_setstylesheet();
   void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
+  struct option_keywords *point_to_option_keywords(unsigned short int token_keyword_or_offset, char is_keyword_or_offset);
 private:
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
@@ -6199,6 +6235,7 @@ private:
   bool is_client_statement(int, int, QString);
   int find_start_of_body(QString text, int start, int *i_of_function, int *i_of_do);
 #if (OCELOT_MYSQL_INCLUDE == 1)
+  int load_libmysqlclient(unsigned int connection_number);
   int connect_mysql(unsigned int connection_number);
   void connect_mysql_error_box(QString, unsigned int);
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
@@ -6207,7 +6244,6 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   const char *tarantool_point_to_data();
-struct option_keywords *point_to_option_keywords(unsigned short int token_keyword_or_offset, char is_keyword_or_offset);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
   int tarantool_get_result_set(int, int);
   QString tarantool_get_messages(int);
@@ -6832,21 +6868,21 @@ enum ocelot_option
 
   OCELOT_OPTION_22=22,  /* ocelot_plugin_dir_as_utf8 */
   OCELOT_OPTION_23=23,  /* for ocelot_default_auth_as_utf8 */
-  OCELOT_OPTION_24=24,  /* for ocelot_opt_bind_as_utf8 */
-  OCELOT_OPTION_25=25,  /* unused. in MySQL, ssl_key */
-  OCELOT_OPTION_26=26,  /* unused. in MySQL, opt_ssl_cert */
-  OCELOT_OPTION_27=27,  /* unused. in MySQL, opt_ssl_ca */
-  OCELOT_OPTION_28=28,  /* unused. in MySQL, opt_ssl_capath */
-  OCELOT_OPTION_29=29,  /* unused. in MySQL, opt_ssl_cipher */
+  OCELOT_OPTION_24=24,  /* for ocelot_ca.opt_bind_address_as_utf8 */
+  OCELOT_OPTION_25=25,  /* ssl_key */
+  OCELOT_OPTION_26=26,  /* opt_ssl_cert */
+  OCELOT_OPTION_27=27,  /* opt_ssl_ca */
+  OCELOT_OPTION_28=28,  /* opt_ssl_capath */
+  OCELOT_OPTION_29=29,  /* opt_ssl_cipher */
   OCELOT_OPTION_30=30,  /* for ocelot_opt_ssl_crl_as_utf8 */
   OCELOT_OPTION_31=31,  /* for ocelot_opt_ssl_crlpath_as_utf8 */
   OCELOT_OPTION_32=32,  /* for ocelot_opt_connect_attr_reset */
-  OCELOT_OPTION_33=33,  /* unused. in MySQL, connect_attr_add */
+  OCELOT_OPTION_33=33,  /* we only use connect_attr_add to say program_name, ocelotgui */
   OCELOT_OPTION_34=34,  /* for ocelot_opt_connect_attr_delete_as_utf8 */
   OCELOT_OPTION_35=35,  /* for ocelot_server_public_key_as_utf8 */
   OCELOT_OPTION_36=36,  /* for ocelot_enable_cleartext_plugin */
   OCELOT_OPTION_37=37,  /* for ocelot_opt_can_handle_expired_passwords */
-  OCELOT_OPTION_38=38,  /* for ocelot_opt_ssl_enforce. skipped in MySQL 8.0 */
+  OCELOT_OPTION_38=38,  /* for ocelot_ca.opt_ssl_enforce. skipped in MySQL 8.0 */
   OCELOT_OPTION_39=39,  /* in MySQL, opt_max_allowed_packet */
   OCELOT_OPTION_40=40,  /* unused. in MySQL, opt_net_buffer_length */
   OCELOT_OPTION_41=41,  /* in MySQL, opt_tls_version. + MariaDB recent. */
@@ -6868,12 +6904,20 @@ enum ocelot_option
   OCELOT_OPTION_53=46, /*  MYSQL_OPT_TLS_SNI_SERVERNAME           --tls-sni-servername */
   OCELOT_OPTION_5999=5999,  /* See long comment beginning with the words "Progress Reports". In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
-  OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory */
+  OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory ... no, whoops, that's gone */
   OCELOT_OPTION_7001=7001, /* for --ssl-fp. The 7000s are for MariaDB Connector/C */
   OCELOT_OPTION_7002=7002, /* for --ssl-fplist */
   OCELOT_OPTION_7003=7003, /* for --ssl-passphrase */
-  OCELOT_OPTION_7017=7017, /* schema */
-  OCELOT_OPTION_7019=7019  /* unused, in MariaDB, found_rows */
+  /* tls_cipher_strength, tls_version, tls_peer_fp, tls_peer_fp_list, connection_read_only, connect_attrs */
+  OCELOT_OPTION_7017=7017, /* schema */   
+  OCELOT_OPTION_7019=7019, /* unused, in MariaDB, found_rows */
+  OCELOT_OPTION_7022=7022, /* for --interactive-timeout */
+  /* New MariaDB options not covered yet: would appear here */
+  /* Anything below here is just FYI, not numbers defined in MariaDB/MySQL, and ignored by options_and_connect */
+  /* There might be tests for option >= OCELOT_OPTION_CO. */
+  OCELOT_OPTION_CO=12000,  /* for mysql_real_connect e.g. host+port */
+  OCELOT_OPTION_CL=12001,  /* for MySQL/MariaDB client behaviour e.g. batch */
+  OCELOT_OPTION_OC=12002   /* for Ocelot-specific behaviour e.g. client_side_functions */
 };
 
 #ifndef HEADER_AES_H
