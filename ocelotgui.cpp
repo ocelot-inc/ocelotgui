@@ -544,7 +544,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   this->setContentsMargins(QMargins(0, 0, 0, 0));
   main_layout= new QVBoxLayout(this);
   main_layout->setSpacing(0);
+#if (QT_VERSION < 0x51500)
   main_layout->setMargin(0);
+#endif
   main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
