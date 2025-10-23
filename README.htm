@@ -1,7 +1,7 @@
 
 ocelotgui
 
-<P>Version 2.5.0</P>
+<P>Version 2.6.0</P>
 
 <P>The ocelotgui GUI, a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2024 by Peter Gulutzan.
+<P>Copyright (c) 2025 by Peter Gulutzan.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -79,8 +79,7 @@ on others you can say "dnf install qt5-qtbase qt5-qtbase-gui".</P>
 
 <P>
 The Qt version number can be found with <i>find /usr/lib -name "libQt*Gui.so*"</i>, or <i>find /usr/lib64 -name "libQt*Gui.so*"</i>.
-If the response starts with libQtGui.so.4 then you have Qt4,
-if the response starts with libQt5Gui.so.5 then you have Qt5.
+If the response starts with libQt5Gui.so.5 then you have Qt5.
 Alternatively it sometimes can be found with qmake -v.
 Peter Gulutzan supplies executables only for Qt version 5, but
 often appropriate files are downloaded automatically during ocelotgui installation.
@@ -125,22 +124,18 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui_2.5.0-1_i386.deb
-sudo apt install ./ocelotgui_2.5.0-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui_2.6.0-1_i386.deb
+sudo apt install ./ocelotgui_2.6.0-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui_2.5.0-1_amd64.deb
-sudo apt install ./ocelotgui_2.5.0-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui_2.6.0-1_amd64.deb
+sudo apt install ./ocelotgui_2.6.0-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0-1.x86_64.rpm
-sudo rpm -i ocelotgui-2.5.0-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui-2.6.0-1.x86_64.rpm
+sudo rpm -i ocelotgui-2.6.0-1.x86_64.rpm</PRE>
 For 64-bit, any Linux, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0.tar.gz
-tar zxvf ocelotgui-2.5.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui-2.6.0.tar.gz
+tar zxvf ocelotgui-2.6.0.tar.gz
 ocelotgui/ocelotgui-qt5</PRE>
-For 64-bit, any Linux, Qt4 (deprecated)<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0.tar.gz
-tar zxvf ocelotgui-2.5.0.tar.gz
-ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
 <H3 id="starting-the-program">Starting the program</H3><HR>
@@ -172,9 +167,9 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 2.5.0, October 7 2024</P>
+<P>Version 2.6.0, October 23 2025</P>
 
-<P>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.</P>
+<P>Copyright (c) 2025 by Peter Gulutzan. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
@@ -618,7 +613,7 @@ SET ocelot_grid_background_color='pink' WHERE column_number = 4 AND value IS NUL
 </P>
 
 
-<P>RE: DEBUGGING WITH MYSQL 5.7. Oracle has made a significant
+<P>RE: DEBUGGING WITH MYSQL 5.7. Oracle made a significant
 incompatible behavior change in version 5.7, which affects the
 debugger. The originally recommended workaround was to say
 "set global show_compatibility_56=on;". We believe we made a
@@ -2237,7 +2232,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 2.5.0 version is okay at the time of release,
+The Release 2.6.0 version is okay at the time of release,
 but some things might not be up to date.
 It may be better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -2388,7 +2383,7 @@ and building again.</P>
 
 <P>The Windows ocelotgui program has the same functionality
 as the Linux ocelotgui program, but is newer and has only
-been tested with basic Windows 10 64-bit machinery.
+been tested with basic Windows 10 and Windows 11 64-bit machinery.
 We believe that on some other Windows platforms it won't start.</P>
 
 <P>Connection should work to any modern MySQL or MariaDB server.</P>
@@ -2398,11 +2393,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui-2.6.0-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-2.5.0-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-2.6.0-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2446,7 +2441,7 @@ The following notes are specifically for ocelotgui for Windows.<br>
 
 <P>Although building ocelotgui from source on Windows should rarely be necessary,
 here are instructions for doing so. You will need:<br>
-Windows 10,<br>
+Windows 10 or Windows 11,<br>
 the source code of ocelotgui (which we always supply with the package),<br>
 an unzipper such as 7-zip,<br>
 the source code of Qt,<br>
@@ -2457,7 +2452,7 @@ disk space. one can use a 64GB USB stick.<br>
 We happened to have Microsoft's Windows SDK available when we built;
 it didn't hurt, but we do not believe it was necessary.<br>
 We assume that %path% includes c:\windows\system32 and all other Windows
-system directories that are normally in the default Windows 10 path.<br>
+system directories that are normally in the default Windows 10/11 path.<br>
 In what follows, we assume the available space is on drive C:.<br>
 In what follows, comment lines begin with colons.</P>
 <pre>
@@ -2540,7 +2535,7 @@ mingw32-make install
 : (Building the MariaDB library)
 
 : You will need MariaDB Connector/C source and library unless you turn off MYSQL_INCLUDE.
-: We used version 3.4.5 Stable. Perhaps other versions work too. 
+: We used version 3.4.7 Stable. Perhaps other versions work too. 
 : Never use a client library associated with MariaDB 10.1.7.
 
 : Make a directory c:\mariadb.
@@ -2551,31 +2546,33 @@ mkdir mariadb
 cd mariadb
 
 : (Get MariaDB Connector/C source) Go to mariadb.org/download
-: Pick Connector, then MariaDB Connector/C 3.4.5 + Source + gzipped tar file
-: Result file should be connector-c/mariadb-connector-c-3.4.5-src.tar.gz
-: Put it on c:\mariadb.
+: Pick Connector, then MariaDB Connector/C 3.4.7 + Source + gzipped tar file
+: Result file should be mariadb-connector-c-3.4.7-src.tar.gz
+: Copy it to c:\mariadb.
 : Unzip.
-"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.5-src.tar.gz
-"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.5-src.tar
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.7-src.tar.gz
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.7-src.tar
 
-: (Get MariaDB Connector/C library) Go to https://mariadb.com/downloads/connectors/
-: Pick Version = 3.3.8-GA, OS = MS Windows (32-bit)
-: Result file should be mariadb-connector-c-3.4.5-win32.msi
+: (Get MariaDB Connector/C library, maybe) Go to https://mariadb.com/downloads/connectors/
+: Pick Version = 3.4.7-GA, OS = MS Windows (32-bit)
+: Result file should be mariadb-connector-c-3.4.7-win32.msi
 : Run the .msi file to install. Assumed result direcctory =
 : c:\Program Files (x86)\MariaDB\MariaDB Connector C
+
+COPY "c:\Program Files (x86)\MariaDB\MariaDB Connector C\include\mariadb_version.h" "c:\mariadb\mariadb-connector-c-3.4.7-src\include\mariadb_version.h"
 
 : (Make a MariaDB Connector/C .a file)
 : Since PATH was set earlier, MinGW tools should be accessible.
 cd c:\mariadb
-Copy "c:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll" mariadb.dll
+Copy "c:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll" libmariadb.dll
 del mariadb.def
 gendef libmariadb.dll 
 dlltool -k --output-lib libmariadb.a --def libmariadb.def
-COPY c:\mariadb\libmariadb.a c:\mariadb\mariadb-connector-c-3.4.5-src\libmariadb\libmariadbclient.a
+COPY c:\mariadb\libmariadb.a c:\mariadb\mariadb-connector-c-3.4.7-src\libmariadb\libmariadbclient.a
 : See also the comments in ocelotgui.h + ocelotgui.cpp near the word MINGW_MARIADB.
 
 : Now you should have a file for static linking named
-: mariadb\mariadb-connector-c-3.4.5-src\libmariadb\libmariadbclient.a
+: mariadb\mariadb-connector-c-3.4.7-src\libmariadb\libmariadbclient.a
 
 : (making ocelotgui.exe)
 
@@ -2623,8 +2620,8 @@ HEADERS += hparse.h
 HEADERS += ostrings.h
 HEADERS += third_party.h
 FORMS += ocelotgui.ui
-INCLUDEPATH += "c:\mariadb\mariadb-connector-c-3.4.5-src\include"
-LIBS += -Lc:\mariadb\mariadb-connector-c-3.4.5-src\libmariadb -lmariadbclient
+INCLUDEPATH += "c:\mariadb\mariadb-connector-c-3.4.7-src\include"
+LIBS += -Lc:\mariadb\mariadb-connector-c-3.4.7-src\libmariadb -lmariadbclient
 
 
 c:
@@ -2647,7 +2644,7 @@ copy release\ocelotgui.exe ocelotgui.exe
 del ocelotui.zip
 "C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png explorer1.png explorer2.png explorer3.png explorer4.png explorer5.png explorer6.png explorer7.png explorer8.png explorer9.png menunew.png plugin.c
 
-: What we actually put in the release looks like ocelotgui-2.5.0-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-2.6.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2725,14 +2722,14 @@ A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz.
 Since version 1.0.9, there is also a release file named ocelotgui_[version].orig.tar.gz
 which is preferable because it does not contain unnecessary executables.
-Thus release 2.5.0 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui_2.5.0.orig.tar.gz.
+Thus release 2.6.0 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui_2.6.0.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui_2.5.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui_2.6.0.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui_2.5.0.orig.tar.gz.</P>
+and click ocelotgui_2.6.0.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -2778,8 +2775,8 @@ sudo pacman -S mariadb-clients</PRE></P>
 <P>(Package builds on ArchLinux-like systems can also be done with the PKGBUILD file in the ocelotgui github repository.)</P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui_2.5.0.orig.tar.gz
- cd ocelotgui-2.5.0</PRE>
+ tar -zxvf ocelotgui_2.6.0.orig.tar.gz
+ cd ocelotgui-2.6.0</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
@@ -2803,12 +2800,12 @@ Peter Gulutzan provides scripts that will create .deb or .rpm packages.
 Please read the comments in the scripts before using them.
 For Debian-like platforms say<PRE>
  ./deb_build.sh
- sudo apt install /tmp/debian3/ocelotgui_2.5.0-1_amd64.deb
- #or sudo apt install /tmp/debian3/ocelotgui_2.5.0-1_i386.deb</PRE>
+ sudo apt install /tmp/debian3/ocelotgui_2.6.0-1_amd64.deb
+ #or sudo apt install /tmp/debian3/ocelotgui_2.6.0-1_i386.deb</PRE>
 For RPM-like platforms say<PRE>
  ./rpm_build.sh
- sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.5.0-1.x86_64.rpm
- #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.5.0-1.i686.rpm</PRE>
+ sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.6.0-1.x86_64.rpm
+ #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.6.0-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>

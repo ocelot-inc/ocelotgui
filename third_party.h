@@ -41,7 +41,7 @@
    Update August 2018: Alas GCC 7 won't let us turn off fpermissive, so explicit casts have been added
                        in about 100 places. But now we shouldn't need
                        #pragma GCC diagnostic warning "-fpermissive"
-                       #pragma GCC diagnostic ignored "-pedantic"
+                       #pragma GCC diagnostic ignored "-Wpedantic"
    Update March 2023: A warning is happening with -Wall and newish compiler on Fedora 37,
                       I disable -Warray-bounds because I don't understand the problem. todo: revisit soon
 */

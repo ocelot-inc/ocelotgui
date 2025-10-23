@@ -29,6 +29,11 @@ as GPL 2, but did not since GPL v2 is compatible.
 Peter Gulutzan was forced to change one (1) line of the source.
 The text of the license is in file COPYING.thirdparty.
 
+On Windows, ocelotgui_mysql.exe (if it is present)
+was statically linked with MySQL Connector C,
+which is distributed according to GPL 2.
+The text of the license is in file COPYING.thirdparty.
+
 On Windows, ocelotgui includes the source code file
 third_party.h, which is distributed according to BSD.
 Almost all code in this file is copied from Tarantool

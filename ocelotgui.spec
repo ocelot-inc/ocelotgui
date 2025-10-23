@@ -1,38 +1,40 @@
-# ocelotgui.spec file for version 2.5.0 supplied by Peter Gulutzan as part of ocelotgui package
+# ocelotgui.spec file for version 2.6.0 supplied by Peter Gulutzan as part of ocelotgui package
 
 #How to Build an .rpm file
 #-------------------------
 # (A version of this is also inside the rpm_build.sh script file.)
 # 1. Install necessary packages. These might already be installed. Some distros prefer dnf to install.
-# sudo yum install qt5-qttools-devel
-# sudo yum install mysql-devel
+# sudo yum install qt5-qttools-devel (or qt5-devel or qt6 equivalents)
+# sudo yum install mysql-devel (or mariadb-devel)
 # sudo yum install gcc gcc-c++ make cmake git
 # sudo yum install rpm rpm-build rpmlint
+# sudo yum install dnf
+#   (dnf is unnecessary if there are explicit --define clauses for dblib and qtlib) 
 # 2. Copy the ocelotgui tar.gz file to your $HOME directory.
 # It is available on github. You might have downloaded it already.
-# For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0.tar.gz
+# For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.6.0/ocelotgui-2.6.0.tar.gz
 # (For this step, we assume you know where you downloaded to. See later explanation in section "Re: Source".)
-# You must copy it to $HOME/ocelotgui-2.5.0.tar.gz -- this is hard coded.
-# If CmakeLists.txt was updated since the release, which is true for 2.5.0, Step #2 will not work -- use Step #2a instead.
-# 2a. Alternative to step 2: make ocelotgui-2.5.0.tar.gz from a clone of the latest ocelotgui source.
+# You must copy it to $HOME/ocelotgui-2.6.0.tar.gz -- this is hard coded.
+# If CmakeLists.txt was updated since the release, which is true for 2.6.0, Step #2 will not work -- use Step #2a instead.
+# 2a. Alternative to step 2: make ocelotgui-2.6.0.tar.gz from a clone of the latest ocelotgui source.
 # This is approximately the way that the ocelotgui developer makes new tar.gz files when making new releases.
-# To produce $HOME/ocelotgui-2.5.0.tar.gz from the latest github source, say:
+# To produce $HOME/ocelotgui-2.6.0.tar.gz from the latest github source, say:
 # cd /tmp
 # rm -r -f ocelotgui
 # git clone https://github.com/ocelot-inc/ocelotgui ocelotgui
 # rm -r -f ocelotgui/.git
-# tar -zcvf $HOME/ocelotgui-2.5.0.tar.gz ocelotgui
+# tar -zcvf $HOME/ocelotgui-2.6.0.tar.gz ocelotgui
 # rm -r -f ocelotgui
-# 3. Remake ocelotgui-2.5.0.tar.gz so it will unpack to directory ocelotgui-2.5.0 rather than to ocelotgui.
-# This step is necessary because ocelotgui.spec will look for files in ocelotgui-2.5.0.
-# To change $HOME/ocelotgui-2.5.0.tar.gz to be ready for rpm, say:
+# 3. Remake ocelotgui-2.6.0.tar.gz so it will unpack to directory ocelotgui-2.6.0 rather than to ocelotgui.
+# This step is necessary because ocelotgui.spec will look for files in ocelotgui-2.6.0.
+# To change $HOME/ocelotgui-2.6.0.tar.gz to be ready for rpm, say:
 # cd /tmp
 # rm -r -f ocelotgui
-# rm -r -f ocelotgui-2.5.0
-# cp -p $HOME/ocelotgui-2.5.0.tar.gz ocelotgui-2.5.0.tar.gz
-# tar -xf ocelotgui-2.5.0.tar.gz
-# mv ocelotgui ocelotgui-2.5.0
-# tar -zcvf $HOME/ocelotgui-2.5.0.tar.gz ocelotgui-2.5.0
+# rm -r -f ocelotgui-2.6.0
+# cp -p $HOME/ocelotgui-2.6.0.tar.gz ocelotgui-2.6.0.tar.gz
+# tar -xf ocelotgui-2.6.0.tar.gz
+# mv ocelotgui ocelotgui-2.6.0
+# tar -zcvf $HOME/ocelotgui-2.6.0.tar.gz ocelotgui-2.6.0
 # 4. Copy the ocelotgui.spec file to your $HOME directory.
 # (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
 # You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
@@ -42,12 +44,14 @@
 # rm -r -f $HOME/ocelotgui_rpm
 # 6. Run rpmbuild using the $HOME/ocelotgui_rpm directory. Notice that we don't bother with an .rpmmacros file.
 # rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild" --define "_sourcedir $HOME"
+#For --define options to force MySQL-vs-MariaDB preference or Qt5-vs-Qt6 preference see "Re Build-Requires:" comments.
 # 7. Find the resulting rpm in the RPMS subdirectory and check it. Here we assume the platform is x86-64.
-# rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.5.0-1.x86_64.rpm
+# rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.6.0-1.x86_64.rpm
 # If it says "0 errors, 0 warnings", you're done!
+# If it says "E: incorrect-fsf-address" read https://ocelot.ca/blog/blog/2025/09/26/mysql-and-mariadb-gpl-licence-error/
 # You can copy the .rpm file to a permanent location and remove the ~/ocelotgui_rpm directory.
 # 8. With the .rpm file you can say
-# sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.5.0-1.x86_64.rpm
+# sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.6.0-1.x86_64.rpm
 # Of course, the .rpm file name will be different on a 32-bit platform.
 # Todo: nowadays yum install or dnf install is probably better, we'll say that in the main README.
 
@@ -65,7 +69,7 @@
 #Re Source:
 #  The URL here is in fact the source of the ocelotgui release.
 #  However, we commented it out because setup doesn't download it
-#  and in any case it would unpack to ocelotgui not ocelotgui-2.5.0.
+#  and in any case it would unpack to ocelotgui not ocelotgui-2.6.0.
 #  The assumption is that Source0: is the file name and the directory
 #  is $HOME and the file needs pre-processing as described above.
 #  Todo: Consider that this is possible:
@@ -75,12 +79,23 @@
 #  Saying Packager:\n causes rpmlint to be quiet but you'll get an error if you try to use it.
 #  So I remove Packager: altogether although rpmlint might warn no-packager-tag.
 #Re Build-Requires:
-#  * qt5-qttools-devel implies that we assume Qt version 5.
-#    In fact Qt version 4 will work well. So will Qt version 6, see also "Re Qt6" below.
-#  * mysql-devel implies that we assume MySQL.
-#    In fact MariaDB will work well so mariadb-devel would be good too.
-#    (or maybe mysql-compat-client?)
+#  * Qt5-vs-Qt6 preference i.e. qt5-qttools-devel or other choices
+#    Qt versions 4 and 5 and 6 all work well. Version 5 is the current default.
+#    If rpmbuild -ba --define "qtlib qt5-qttools-devel" ocelotgui.spec then BuildRequires: qt5-qttools-devel
+#    If rpmbuild -ba --define "qtlib qt6-qttools-devel" ocelotgui.spec then BuildRequires: qt6-qttools-devel
+#    If no --define, then BuildRequires: libqt5-qttools-devel or qt5-devel or qt5-qttools-devel
+#    (it depends on the distro and version).
+#  * MySQL-vs-MariaDB preference i.e. mysql-devel or mariadb-devel
+#    If rpmbuild -ba --define "dblib mysql-devel" ocelotgui.spec then BuildRequires: mysql_devel
+#    If rpmbuild -ba --define "dblib mariadb-devel" ocelotgui.spec then BuildRequires: mariadb-devel
+#    If no --define, and mysql-devel was installed earlier, then BuildRequires: mysql-devel
+#    Else BuildRequires: mariadb-devel
 #    The requirement exists because our source has "#include mysql.h".
+#    The choice doesn't matter because ocelotgui only uses mysql.h definitions that are the same
+#    in both MySQL and MariaDB.
+#    If you use rpm_build.sh and prefer mariadb-devel, change the install command there.  
+#    Todo: Check: Maybe  --define "dblib mysql-compat-client" would work too?
+#    Todo: Check: rpm -q --provides mariadb
 #  * All the other Build-Requires packages are common utilities
 #    that are easily available on any rpm-based distro.
 #    ocelotgui does not require a MySQL or MariaDB server to build.
@@ -130,7 +145,8 @@
 #  which this cancels, but it has to be regarded as temporary. 
 #Re Qt6
 #  If the intent is to link with Qt version 6 instead of 5 or 4, changes are small:
-#   In rpm_build.sh, if you use it, you must first install qt6_qttools_devel
+#   In rpm_build.sh, if you use it, you must first install qt6-qttools-devel or equivalent.
+#   Use --define
 #   Here in ocelotgui.spec in BuildRequires you must change all occurrences of "qt5" to "qt6"
 #   Here in ocelotgui.spec add -DQT_VERSION=6 for the cmake because cmake will look first for Qt5
 
@@ -180,14 +196,13 @@
 
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
-Version:        2.5.0
+Version:        2.6.0
 Release:        1
 
-%if %{?suse_version:1}%{!?suse_version:0}
+#Until ocelotgui 2.6, License: GPLv2 was assumed except for some SUSE versions.
+#Now the check for SUSE version is disabled and License: GPL-2.0-only is assumed.
+#Probably this will cause warnings with some distros, we don't check them all.
 License:        GPL-2.0-only
-%else
-License:        GPLv2
-%endif
 
 %if %{?mdvver:1}%{!?mdvver:0}
 Group:          Applications/Databases
@@ -200,19 +215,47 @@ Group:          Databases
 %endif
 Vendor:         Peter Gulutzan
 Url:            http://ocelot.ca
-#Source0:        ocelotgui-2.5.0.tar.gz
-Source:         https://github.com/ocelot-inc/%name/releases/download/2.5.0/%name-%{version}.tar.gz
+#Source0:        ocelotgui-2.6.0.tar.gz
+Source:         https://github.com/ocelot-inc/%name/releases/download/2.6.0/%name-%{version}.tar.gz
 
-%if %{?suse_version:1}%{!?suse_version:0}
-BuildRequires:  libqt5-qttools-devel
+%if %{undefined qtlib}
+  %if %{?suse_version:1}%{!?suse_version:0}
+    %define qtlib libqt5-qttools-devel
+  %else
+    %if %{?mdvver:1}%{!?mdvver:0}
+      %define qtlib qt5-devel
+    %else
+      %define qtlib qt5-qttools-devel
+    %endif
+  %endif
+%endif
+BuildRequires: %qtlib
+
+%if %{undefined dblib}
+%define mysql_devel_installed_count %(dnf list --installed | grep mysql-devel -c)
+%if %mysql_devel_installed_count > 0
+%define dblib mysql-devel
 %else
-%if %{?mdvver:1}%{!?mdvver:0}
-BuildRequires:  qt5-devel
-%else
-BuildRequires:  qt5-qttools-devel
+%define dblib mariadb-devel
 %endif
 %endif
-BuildRequires:  mysql-devel
+BuildRequires: %dblib
+
+#Todo: Qt4? What to do with qtversion? better name than qtversion? how to undefine?
+%if "%{qtlib}" < "qt"
+  %if "%{qtlib}" >= "libqt6"
+    %define qtversion "6"
+  %else
+    %define qtversion "5"
+  %endif
+%else
+  %if "%{qtlib}" >= "qt6"
+    %define qtversion "6"
+  %else
+    %define qtversion "5"
+  %endif
+%endif
+
 BuildRequires:  gcc >= 5.1
 BuildRequires:  gcc-c++ >= 5.1
 BuildRequires:  make
@@ -220,6 +263,7 @@ BuildRequires:  cmake >= 2.8.11
 BuildRequires:  sed
 BuildRequires:  rpm rpm-build rpmlint
 BuildRequires:  desktop-file-utils
+BuildRequires:  dnf
 
 #Prefix: /usr
 
@@ -232,22 +276,24 @@ GUI client for MySQL or MariaDB or similar servers
  and a debugger.
 
 %prep
-%%setup -q
+%setup -q
 
 sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{version}/%{name}.desktop
 
 %build
 %if %{?suse_version:1}%{!?suse_version:0}
 %cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
-       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags" -DOCELOT_LD_FLAGS:STRING="-pie"
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags" -DOCELOT_LD_FLAGS:STRING="-pie" -DQT_VERSION="%qtversion"
 %else
 %if %{?mdvver:1}%{!?mdvver:0}
 %cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
-       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags" -DQT_VERSION="%qtversion"
 %else
 %cmake . -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE \
-       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags" -DQT_VERSION="%qtversion"
 %endif
+
+
 %endif
 %make_build
 
@@ -269,7 +315,9 @@ cd %{_builddir}/%{name}-%{version}/build
 %files
 %defattr(-,root,root,-)
 %{_bindir}/ocelotgui
+%{_bindir}/pgoptionfiles
 %{_mandir}/man1/ocelotgui.1*
+%{_mandir}/man1/pgoptionfiles.1*
 %doc completer_1.png
 %doc completer_2.png
 %doc completer_3.png
@@ -323,6 +371,8 @@ cd %{_builddir}/%{name}-%{version}/build
 %{_datadir}/pixmaps/ocelotgui-logo.png
 
 %changelog
+* Thu Oct 23 2025 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.6.0-1
+  Different way to connect.
 * Mon Oct 07 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.5.0-1
   Bug fixes.
 * Tue Jun 04 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.4.0-1

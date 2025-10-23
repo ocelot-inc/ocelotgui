@@ -1,11 +1,11 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 2.5.0
-   Last modified: August 19 2025
+   Version: 2.6.0
+   Last modified: October 23 2025
 */
 /*
-  Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
+  Copyright (c) 2025 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -128,6 +128,9 @@
     ostrings.h          strings that contain English translatable text
     third_party.h       from tarantool-c, If cmake . -DOCELOT_THIRD_PARTY=0 then #include third_party.h won't happen
     pgfindlib.h         look for .so libraries
+    readmylogin.c       might be used to read a MySQL "encrypted" file
+    plugin.c            example only, for a user-supplied plugin
+    pgoptionfiles.c     might be used to see what MySQL .so files exist
 
   There are three main widgets, which generally appear top-to-bottom on
   the screen: history_edit_widget = an uncomplicated text edit which gets
@@ -153,7 +156,7 @@
   The code #includes header files from MySQL/Oracle and from Qt/Digia,
   and may rely on MySQL or MariaDB libraries if it connects to MySQL or MariaDB servers,
   and relies on the Qt core, gui, and widgets libraries.
-  Builds have been successful with several Linux distros and gcc 4.6/4.7/7.3.
+  Builds have been successful with several Linux distros and gcc 4.6/4.7/7.3/9.4.
   Build instructions are in the user manual or in a readme file.
 
   There are many comments. Searching for the word "Todo:" in the comments
@@ -268,7 +271,7 @@ static struct plugin_pass ocelot_plugin_pass {
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="2.5.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.6.0"; /* For --version. Make sure it's in manual too. */
   static uint32_t dbms_version_mask= FLAG_VERSION_DEFAULT; /* was unsigned int till 20250422 */
 
 /* Global mysql definitions */
@@ -5458,7 +5461,7 @@ void MainWindow::action_file_connect_once(QString message)
   if (message == "Print")
   {
     char output_string[5120];
-    for (int column_index= 0; column_index < column_count; ++column_index)
+    for (unsigned int column_index= 0; column_index < column_count; ++column_index)
     {
       strcpy(output_string, row_form_label[column_index].toUtf8());
       printf("%-34s", output_string);
@@ -6428,7 +6431,7 @@ void MainWindow::action_help_about(bool is_checked)
   (void)is_checked;
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2024 by Peter Gulutzan.<br>\
+<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2025 by Peter Gulutzan.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -6518,10 +6521,10 @@ void MainWindow::action_help_the_manual(bool is_checked)
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 2.5.0, October 7 2024  \
+  <BR>Version 2.6.0, October 23 2025  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.  \
+  <BR>Copyright (c) 2025 by Peter Gulutzan. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -8459,7 +8462,7 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
       /* or TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE */
       /* or TOKEN_TYPE_COMMENT_WITH_MINUS */
       if ((text.mid(token_offsets[i], 2) == "/*")
-       || (text.mid(token_offsets[i], 2) == "--")
+       || ((text.mid(token_offsets[i], 2) == "--") && (token_lengths[i] > 1))
        || ((text.mid(token_offsets[i], 1) == "#")
            && (connections_dbms[connection_number] != DBMS_TARANTOOL)))
       {
@@ -16772,6 +16775,7 @@ struct reftypewords {
 */
 int MainWindow::load_libmysqlclient(unsigned int connection_number)
 {
+  (void) connection_number; /* suppress "unused parameter" warning */
   QString ldbms_return_string;
   ldbms_return_string= "";
 #if (OCELOT_PGFINDLIB == 1)
@@ -16852,7 +16856,7 @@ int MainWindow::load_libmysqlclient(unsigned int connection_number)
 /* Todo: disconnect old if already connected. */
 int MainWindow::connect_mysql(unsigned int connection_number)
 {
-  load_libmysqlclient(connection_number); /* todo: could return an error or NULL. might already be done. */
+  if (load_libmysqlclient(connection_number) == 1) return 1; /* todo: could return an error or NULL. might already be done. */
 
   if (is_mysql_library_init_done == false)
   {
@@ -24129,6 +24133,7 @@ Small_dialog::~Small_dialog()
 /* See long comment elsewhere beginning with the words Progress Reports */
 Progress_report::Progress_report(MainWindow *parent, QString passed_value) /* constructor */
 {
+  (void) parent; /* suppress "unused parameter" warning */
   setText(passed_value);
 }
 
@@ -24558,7 +24563,7 @@ TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, un
    Todo: actually you should operate on a copy of argc + argv, rather than change the originals. QT docs say so.
          but that would contradict another todo, which is to blank the password if it's in an argv
    Most options are ignored but the ones which might be essential for connecting are not ignored.
-   Example: if ~/.my.cnf has "port=3306" in [clients] group, and start happens with --host=127.0.0.1,
+   Example: if ~/.my.cnf has "port=3306" in [client] group, and start happens with --host=127.0.0.1,
             then port=3306 and current_host=127.0.0.1 and that will get passed to the connect routine.
    Read: http://dev.mysql.com/doc/refman/5.6/en/connecting.html
          See also http://dev.mysql.com/doc/refman/5.6/en/mysql-command-options.html
@@ -25040,6 +25045,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 */
 int MainWindow::option_files(QByteArray soname, char *my_cnf_files, const char *home)
 {
+  (void) soname; /* suppress "unused parameter" warning */
   if (connections_dbms[0] == DBMS_TARANTOOL) return 0;
   char my_cnf_files_for_compare[PATH_MAX * 2]= "";
   /* timed on my machine: 420 ms first time, 43 ms if loaded earlier, i.e. expensive for initialization */
@@ -25228,7 +25234,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
 /*
   Re groups:
     The MySQL mysql client looks for [client] and [mysql].
-    The MariaDB mysql client looks for [client] and [mysql] and [client-server] and [mariadb-client].
+    The MariaDB mysql client looks for [client] and [mysql] and [client-server] and [client-mariadb].
     Re MariaDB-specific groups [client-server] and [client-mariadb]:
     The problem is that we don't know for sure we're connecting to a MariaB server until after we connect.
     For [client-server] I'm going to assume that anything in the group is probably valid for a MySQL server too.
@@ -26075,7 +26081,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     }
     else if ((what_to_do & (OPTION_TO_IS_ENABLE | OPTION_TO_INT_TOKEN2 | OPTION_TO_0)) != 0)
     {
-      uint64_t val;
+      uint64_t val= 0;
       if ((what_to_do & OPTION_TO_IS_ENABLE) != 0) val= is_enable;
       if ((what_to_do & OPTION_TO_0)  != 0) val= 0;
       if ((what_to_do & OPTION_TO_INT_TOKEN2) != 0) val= to_long(token2);
@@ -26278,6 +26284,7 @@ static void progress_report_callback(const MYSQL *mysql, uint stage, uint max_st
                             double progress, const char *proc_info,
                             uint proc_info_length)
 {
+  (void) mysql; /* suppress "unused parameter" warning */
   sprintf(report_string, "/* Stage: %d of %d '%.*s' %6.3g%% of stage done */\n",
                       stage, max_stage, proc_info_length, proc_info,
                       progress);
@@ -26330,12 +26337,14 @@ int options_and_connect(
 #else
   lmysql->ldbms_mysql_init(&mysql[connection_number]);
   /* Todo: At this point mysql_client_version() should work. With Windows it's not usually dynamically loaded. */
-  strncpy(client_info, lmysql->ldbms_mysql_get_client_info(), sizeof(client_info));
+  strncpy(client_info, lmysql->ldbms_mysql_get_client_info(), sizeof(client_info) - 1);
 #endif
 
+#ifdef OLD_OPTION_HANDLER
   unsigned int abi_offset= 0;
-  unsigned long real_connect_flags= 0;
   int ssl_opt= 0;
+#endif
+  unsigned long real_connect_flags= 0;
 
   int rdd;
 
@@ -26707,7 +26716,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2024 by Peter Gulutzan and others\n");
+  printf("Copyright (c) 2025 by Peter Gulutzan and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");
@@ -30912,7 +30921,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
 
 #if (OCELOT_PGFINDLIB == 1)
   {
-    const char *so_to_find;
+    const char *so_to_find= NULL;
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) so_to_find= "libmysqlclient.so";
     else if (which_library == WHICH_LIBRARY_LIBCRYPTO) so_to_find= "libcrypto.so";
     else if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) so_to_find= "libmysqlclient.so.18";
@@ -31076,7 +31085,8 @@ printf("connect_soname %s.\n", connect_soname.constData());
 #if (OCELOT_MYSQL_INCLUDE == 1)
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
       {
-        t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
+        /* Todo: find out why t__mysql_affected_rows missing on FreeBSD. No error message since it's not much used. */
+        t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows");
         t__mysql_close= (tmysql_close) dlsym(dlopen_handle, "mysql_close"); if (dlerror() != 0) s.append("mysql_close ");
         t__mysql_data_seek= (tmysql_data_seek) dlsym(dlopen_handle, "mysql_data_seek"); if (dlerror() != 0) s.append("mysql_data_seek ");
         t__mysql_errno= (tmysql_errno) dlsym(dlopen_handle, "mysql_errno"); if (dlerror() != 0) s.append("mysql_errno ");
@@ -31272,6 +31282,7 @@ printf("connect_soname %s.\n", connect_soname.constData());
 #if (OCELOT_MYSQL_INCLUDE == 1)
 my_ulonglong ldbms::ldbms_mysql_affected_rows(MYSQL *mysql)
 {
+  if (t__mysql_affected_rows == 0) return 0; /* kludge if dlsym() failed */
   return t__mysql_affected_rows(mysql);
 }
 void ldbms::ldbms_mysql_close(MYSQL *mysql)

@@ -7,7 +7,7 @@ Author: Peter Gulutzan
 This file has notes about building ocelotgui on some Linux platforms.
 It may appear on GitHub (due to git add) but not in releases.
 It will not interest ordinary users.
-For ocelotgui version 2.5.0. When making a new version, change 2.5.0 to whatever the new version number is.
+For ocelotgui version 2.6.0. When making a new version, change 2.6.0 to whatever the new version number is.
 
 
 Download github cli
@@ -16,17 +16,17 @@ Download github cli
 Download via https://github.com/cli/cli/blob/trunk/docs/install_linux.md
 Later, wherever you see the phrase "Upload to internet"
   gh release upload <tag> <files>... [flags]
-... but the upload is actually for the tag of an earlier version, since 2.5.0 doesn't fully exist till all is built.
+... but the upload is actually for the tag of an earlier version, since 2.6.0 doesn't fully exist till all is built.
 ... I think you have to run this from an ocelotgui repository.
 
-ocelotgui_2.5.0.orig.tar.gz
+ocelotgui_2.6.0.orig.tar.gz
 ---------------------------
 
 Machine: ubuntu_24_64 i.e. Ubuntu version 24 64-bit. This is the machine used for ordinary pushes.
 Contains: source.
 
 !!!! PLACE THE FOLLOWING STATEMENTS IN A FILE howtobuild.sh AND SAY howtobuild.sh -- COPY/PASTE TO SHELL CAN FAIL!
-!!!! (as far as the ocelotgui-2.5.0.orig.tar.gz copy)
+!!!! (as far as the ocelotgui-2.6.0.orig.tar.gz copy)
 !!!! Do not worry about errors mentioning debian/files but do worry about any other error messages.
 
 
@@ -132,10 +132,10 @@ cp -p  -v ~/ocelotgui/menunew.png ocelotgui/menunew.png
 cp -p  -v ~/ocelotgui/plugin.c ocelotgui/plugin.c
 chmod -R a+r ocelotgui
 cd /tmp
-tar -zcvf /tmp/ocelotgui-2.5.0.orig.tar.gz ocelotgui
+tar -zcvf /tmp/ocelotgui-2.6.0.orig.tar.gz ocelotgui
 
-Upload ocelotgui-2.5.0.orig.tar.gz to internet.
-gh release upload 2.4.0 ocelotgui-2.5.0.orig.tar.gz
+Upload ocelotgui-2.6.0.orig.tar.gz to internet.
+gh release upload 2.4.0 ocelotgui-2.6.0.orig.tar.gz
 
 ocelotgui_u16.tar.gz
 --------------------
@@ -144,14 +144,14 @@ Machine: Ubuntu 16_64, old Ubuntu so it has old versions of Qt build-essential e
 
 Make ocelotgui-qt4, which only goes in the tar.gz not the orig.tar.gz.
 Add it to ocelotgui.
-So ocelotgui_u16.tar.gz is the same as ocelotgui-2.5.0.orig.tar.gz, plus one file: ocelotgui-qt4
+So ocelotgui_u16.tar.gz is the same as ocelotgui-2.6.0.orig.tar.gz, plus one file: ocelotgui-qt4
 
 Download :
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.6.0.orig.tar.gz
 
 cd /tmp
 rm -r -f ocelotgui
-tar -xzf ocelotgui-2.5.0.orig.tar.gz
+tar -xzf ocelotgui-2.6.0.orig.tar.gz
 cd ocelotgui
 
 To eliminate warnings about c++11 requirements, in ocelotgui.pro change
@@ -167,7 +167,7 @@ make
 cp -p -v ocelotgui /tmp/ocelotgui-qt4
 cd /tmp
 rm -r -f ocelotgui
-tar -xzf ocelotgui-2.5.0.orig.tar.gz
+tar -xzf ocelotgui-2.6.0.orig.tar.gz
 cp -p -v ocelotgui-qt4 ./ocelotgui/ocelotgui-qt4
 
 chmod -R a+r ocelotgui
@@ -177,13 +177,13 @@ tar -zcvf /tmp/ocelotgui_u16.tar.gz ocelotgui
 Upload ocelotgui_u16.tar.gz to internet.
 gh release upload 2.4.0 ocelotgui_u16.tar.gz
 
-ocelotgui_2.5.0-1_amd64.deb
+ocelotgui_2.6.0-1_amd64.deb
 ---------------------------
 
 Machine: ubuntu_16_64 (64-bit 16.04 xenial)
          Once again I use ubuntu_16_64, not ubuntu_16_64_tmp, ubuntu_16_64_tmp lacks some qt5 files
-Source: ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui_2.5.0-1_amd64.deb, which is uploadable for release
+Source: ocelotgui_2.6.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
+Result: ocelotgui_2.6.0-1_amd64.deb, which is uploadable for release
 
 WARNING: This contains rm -r -f ocelotgui, so if there was a git clone to ocelotgui it's wiped out.
 
@@ -195,14 +195,14 @@ Preferred way: with deb_build.sh
 cd /tmp
 
 Download :
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.6.0.orig.tar.gz
 
 
 # Just to make sure sudo works
 sudo ls a
-export OCELOT_VERSION=2.5.0
+export OCELOT_VERSION=2.6.0
 cd ~
-rm -r -f ocelotgui-2.5.0
+rm -r -f ocelotgui-2.6.0
 #rm -r -f ocelotgui
 tar -xzf ocelotgui_$OCELOT_VERSION.orig.tar.gz
 mv ocelotgui-$OCELOT_VERSION ocelotgui
@@ -215,7 +215,7 @@ lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb
 
 Not preferred but quicker way: debuild
 
-export OCELOT_VERSION=2.5.0
+export OCELOT_VERSION=2.6.0
 cd /tmp
 rm -r -f /tmp/debian3
 mkdir /tmp/debian3
@@ -240,17 +240,17 @@ lintian -I ocelotgui_$OCELOT_VERSION-1_amd64.deb
 
 cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb tmp/ocelotgui_$OCELOT_VERSION-1_amd64.deb
 
-Upload ocelotgui_2.5.0-1_amd64.deb to internet.
+Upload ocelotgui_2.6.0-1_amd64.deb to internet.
 gh release upload 2.4.0 ocelotgui-2.50-1_amd64.deb
 
-ocelotgui-2.5.0.tar.gz
+ocelotgui-2.6.0.tar.gz
 ----------------------
 
 About the same as ocelotgui_u16.tar.gz but done with Ubuntu 18 and adds ocelotgui-qt5.
 
 Make ocelotgui-qt5, which only goes in the tar.gz not the orig.tar.gz.
 Add it to ocelotgui.
-So ocelotgui-2.5.0.tar.gz is the same as ocelotgui-2.5.0.orig.tar.gz, plus two files: ocelotgui-qt4 + ocelotgui-qt5.
+So ocelotgui-2.6.0.tar.gz is the same as ocelotgui-2.6.0.orig.tar.gz, plus two files: ocelotgui-qt4 + ocelotgui-qt5.
 
 Download :
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_u16.tar.gz
@@ -274,27 +274,27 @@ cp -p -v ocelotgui-qt5 ./ocelotgui/ocelotgui-qt5
 
 chmod -R a+r ocelotgui
 cd /tmp
-tar -zcvf /tmp/ocelotgui-2.5.0.tar.gz ocelotgui
+tar -zcvf /tmp/ocelotgui-2.6.0.tar.gz ocelotgui
 
-Upload ocelotgui-2.5.0.tar.gz to internet.
-gh release upload 2.4.0 ocelotgui-2.5.0.tar.gz
+Upload ocelotgui-2.6.0.tar.gz to internet.
+gh release upload 2.4.0 ocelotgui-2.6.0.tar.gz
 
 Remove ocelotgui_u16.tar.gz from internet.
 
 
 
-ocelotgui_2.5.0-1_i386.deb
+ocelotgui_2.6.0-1_i386.deb
 --------------------------
 
 Machine: ubuntu_16_32 (32-bit 16.04 xenial)
-Source: ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui_2.5.0-1_i386.deb, which is uploadable for release
+Source: ocelotgui_2.6.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
+Result: ocelotgui_2.6.0-1_i386.deb, which is uploadable for release
 Todo: probably next time I should use deb_build.sh not debuild, as I did for the 64-bit .deb.
 
 Download : to ~
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.6.0.orig.tar.gz
 
-export OCELOT_VERSION=2.5.0
+export OCELOT_VERSION=2.6.0
 cd /tmp
 rm -r -f /tmp/debian3
 mkdir /tmp/debian3
@@ -313,17 +313,17 @@ lintian -I ocelotgui_$OCELOT_VERSION-1_i386.deb
 #testsuite-autopkgtest-missing
 cp -p ocelotgui_$OCELOT_VERSION-1_i386.deb tmp/ocelotgui_$OCELOT_VERSION-1_i386.deb
 
-Upload ocelotgui_2.5.0-1_i386.deb to internet.
+Upload ocelotgui_2.6.0-1_i386.deb to internet.
 gh release upload 2.4.0 ocelotgui-2.5.-1+i386.deb
 
 
 
-ocelotgui-2.5.0-1.x86_64.rpm
+ocelotgui-2.6.0-1.x86_64.rpm
 ----------------------------
 
 Machine: Fedora (64-bit Fedora 24) Not Fedora 28, which I guess has a too-recent Qt version (Fedora 24 has Qt 5.6.2)
-Source: ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui-2.5.0-1.x86_64.rpm, which is uploadable for release
+Source: ocelotgui_2.6.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
+Result: ocelotgui-2.6.0-1.x86_64.rpm, which is uploadable for release
 
 
 
@@ -331,10 +331,10 @@ Result: ocelotgui-2.5.0-1.x86_64.rpm, which is uploadable for release
 
 
 Download: to ~
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.6.0.orig.tar.gz
 
 #Why tar.gz not orig.tar.gz?
-export OCELOT_VERSION=2.5.0
+export OCELOT_VERSION=2.6.0
 cd ~
 rm rpm_build.sh
 rm -r -f ~/ocelotgui_rpm
@@ -356,12 +356,12 @@ and then using the generated token with
 export GH_TOKEN=<token>
 When you upload you probably need to be on a GitHub repository so cd and cp
 
-Upload ocelotgui-2.5.0-1.x86_64.rpm to internet.
-gh release upload 2.4.0 ocelotgui-2.5.0-1.x86_64.rpm
+Upload ocelotgui-2.6.0-1.x86_64.rpm to internet.
+gh release upload 2.4.0 ocelotgui-2.6.0-1.x86_64.rpm
 
 
 
-ocelotgui-2.5.0-1.ocelotgui.zip
+ocelotgui-2.6.0-1.ocelotgui.zip
 -------------------------------
 
 Machine: Windows 10.

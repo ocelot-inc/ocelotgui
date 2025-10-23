@@ -1,8 +1,8 @@
 /*
   pgfindlib.c --   To get a list of paths and .so files along paths dynamic loader might choose, with some extra information
 
-   Version: 0.9.7
-   Last modified: April 10 2025
+   Version: 0.9.8
+   Last modified: September 25 2025
 
   Copyright (c) 2025 by Peter Gulutzan. All rights reserved.
 
@@ -567,11 +567,13 @@ int pgfindlib_get_origin_and_lib_and_platform(char *origin, char *lib, char *pla
 #endif
 
 /* todo: move this up, and if it's zilch then we cannot read elf here */
-extern void* __executable_start;
+/* This was void* but that triggered -Warray-bounds during an rpm build. */
+extern ElfW(Ehdr) __executable_start;
   ElfW(Ehdr)*ehdr= NULL;
-  if (__executable_start != NULL)
+  ehdr= (ElfW(Ehdr)*) &__executable_start; /* linker e.g. ld.bfd or ld.lld is supposed to add this */
+  if (ehdr != NULL)
   {
-    ehdr= (ElfW(Ehdr)*) &__executable_start; /* linker e.g. ld.bfd or ld.lld is supposed to add this */
+
     if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0)
     {
 #if (PGFINDLIB_COMMENT_EHDR_IDENT != 0)

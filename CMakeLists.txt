@@ -1,4 +1,4 @@
-# Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
+# Copyright (c) 2025 by Peter Gulutzan. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -151,11 +151,15 @@
 
 # FILENAME_EXTRA
 # Default is blank. ocelotgui passes -DFILENAME_EXTRA="qt4" when building with qt4,
-# so the final package name will look like ocelotgui_2.5.0qt4-1_amd64.deb or
-# ocelotgui-2.5.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
+# so the final package name will look like ocelotgui_2.6.0qt4-1_amd64.deb or
+# ocelotgui-2.6.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
 
 # FILENAME_RELEASE
 # Default is "1". Ordinarily it doesn't need to be changed.
+
+# OCELOT_PGOPTIONFILES
+# By Linux default this is 1. if -DOCELOT_PGOPTIONFILES=0, ocelotgui will not use pgoptionfiles.c / pgoptionfiles.h.
+# By non-Linux default this is 0. Todo: maybe there's a way to get it going with FreeBSD or Windows.
 
 # e.g. to build and put results in ./bin, if CMAKE_PREFIX_PATH not needed, say
 # cmake . -DCMAKE_PREFIX_PATH=/home/pgulutzan/Qt/5.4/gcc_64/lib/cmake/Qt5Widgets -DCMAKE_INSTALL_PREFIX=.
@@ -164,21 +168,20 @@
 
 # e.g. to generate .deb file and install with dpkg:
 # deb_build.sh, which copies files and invokes debian/rules, which uses CMakeLists.txt
-# sudo dpkg -i ocelotgui_2.5.0-1_amd64.deb
+# sudo dpkg -i ocelotgui_2.6.0-1_amd64.deb
 # but see also comments in deb_build.sh and debian/README.Debian
 
 # e.g. to generate .rpm file and install with rpm:
 # rpm_build.sh, which copies files and invokes ocelotgui.spec, which uses CMakeLists.txt
-# rpmlint ocelotgui-2.5.0-1.x86_64.rpm
-# rpm -i ocelotgui-2.5.0-1.x86_64.rpm
+# rpmlint ocelotgui-2.6.0-1.x86_64.rpm
+# rpm -i ocelotgui-2.6.0-1.x86_64.rpm
 # but see also comments in rpm_build.sh
 
-# Todo: We only check if CMAKE_SYSTEM_PROCESSOR = x86_64. On FreeBSD 12, uname -p says amd64.
 # Todo: Maybe set(CMAKE_CXX_FLAGS "${Qt6Widgets_EXECUTABLE_COMPILE_FLAGS}") as we do for Qt5Widgets.
 # Todo: We do not install README_tarantool.htm or the *_tarantool.png files, though we put them on github.
 # Todo: We do not install ocelotgui-logo.png, we only install ocelotgui_logo.png.
 
-message("-- CmakeLists.txt for ocelotgui 2.5.0")
+message("-- CmakeLists.txt for ocelotgui 2.6.0")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
 
@@ -219,6 +222,7 @@ if (TMP_OCELOT_MYSQL_INCLUDE)
 # Second time, use hard-coded list "/usr/include/mysql" etc.
 # without specifying NO_DEFAULT_PATH so CMake searches its default
 # directories first so quite often the hard-coded list doesn't matter.
+# (Often something like /usr/include/mysql is default path.)
 # We don't need this if "DEB" because in debian/rules we find package's path.
 unset(MYSQL_INCLUDE_DIR_RESULT)
 unset(MYSQL_INCLUDE_DIR_SEARCH_PATH)
@@ -229,7 +233,7 @@ if (MYSQL_INCLUDE_DIR)
   endif (NOT MYSQL_INCLUDE_DIR_RESULT)
 endif (MYSQL_INCLUDE_DIR)
 if (NOT MYSQL_INCLUDE_DIR_RESULT)
-  set(MYSQL_INCLUDE_DIR_SEARCH_PATH "/usr/include/mysql"
+  set(MYSQL_INCLUDE_DIR_SEARCH_PATH
        "/usr/include/mysql"
        "/usr/local/include/mysql"
        "/usr/local/mysql/include"
@@ -262,6 +266,7 @@ if (TMP_OCELOT_MYSQL_INCLUDE)
 # Add MYSQL headers.
 include_directories(${MYSQL_INCLUDE_DIR_RESULT})
 endif (TMP_OCELOT_MYSQL_INCLUDE)
+
 
 #lintian complained about "unstripped-binary-or-object"
 # SET(CMAKE_BUILD_TYPE "Release" was useless
@@ -352,7 +357,7 @@ if (Qt5Widgets_FOUND)
   message("-- found Qt5")
   # -fPIE, but nobody has checked whether other flags are better
   # (some other flags depend on CMAKE_BUILD_TYPE)
-  # (The ocelotgui developer uses ocelotgui.pro which has -Wall -O2)
+  # (The ocelotgui developer uses ocelotgui.pro which has -Wall -O2) (or maybe it doesn't any more?)
   set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
   #Produce ui_ocelotgui.h from ocelotgui.ui
   qt5_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
@@ -390,6 +395,22 @@ if (OCELOT_CPPCHECK EQUAL "1")
           "--suppressions-list=${CMAKE_SOURCE_DIR}/suppressions.txt"
   )
 endif (OCELOT_CPPCHECK EQUAL "1")
+
+string(TOLOWER "${CMAKE_SYSTEM_NAME}" cmake_system_name_lower)
+
+#If cmake . -DOCELOT_PGOPTIONFILES=0 then most code related to pgoptionfiles.c | pgoptionfiles.h will not be included
+if (DEFINED OCELOT_PGOPTIONFILES)
+  set(TMP_OCELOT_PGOPTIONFILES ${OCELOT_PGOPTIONFILES})
+  add_definitions(-DOCELOT_PGOPTIONFILES=${OCELOT_PGOPTIONFILES})
+else (DEFINED OCELOT_PGOPTIONFILES)
+  if (cmake_system_name_lower MATCHES "linux")
+    set(TMP_OCELOT_PGOPTIONFILES TRUE)
+    add_definitions(-DOCELOT_PGOPTIONFILES=1)
+  else (cmake_system_name_lower MATCHES "linux")
+    set(TMP_OCELOT_PGOPTIONFILES FALSE)
+    add_definitions(-DOCELOT_PGOPTIONFILES=0)
+  endif (cmake_system_name_lower MATCHES "linux")
+endif (DEFINED OCELOT_PGOPTIONFILES)
 
 #MinGW ignores #pragmas in third_party.h
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
@@ -448,6 +469,12 @@ if (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 target_link_libraries(ocelotgui dl)
 endif (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
+if (TMP_OCELOT_PGOPTIONFILES)
+message("-- Adding pgoptionfiles")
+add_executable(pgoptionfiles pgoptionfiles.c)
+target_link_libraries(pgoptionfiles dl)
+endif (TMP_OCELOT_PGOPTIONFILES)
+
 # ocelotgui uses pthread. Some linkers might demand this.
 target_link_libraries(ocelotgui pthread)
 
@@ -473,13 +500,14 @@ if (NOT TMP_CMAKE_SKIP_RPATH)
   else (TMP_INSTALL_RPATH STREQUAL "")
     set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}:")
   endif (TMP_INSTALL_RPATH STREQUAL "")
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    message("-- 64-bit")
+# On 64-bit Linux, CMAKE_SYSTEM_PROCESSOR is probably x86_64. On FreeBSD, uname -p is amd64.
+  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
+    message("-- ${CMAKE_SYSTEM_PROCESSOR} 64-bit")
     set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib64/mysql:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib:/usr/lib64/mariadb")
-  else (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    message("-- 32-bit")
+  else (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
+    message("-- ${CMAKE_SYSTEM_PROCESSOR} 32-bit")
     set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/i386-linux-gnu:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib")            
-  endif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  endif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
   message("-- rpath = ${TMP_INSTALL_RPATH}")
   set_target_properties(ocelotgui PROPERTIES INSTALL_RPATH "${TMP_INSTALL_RPATH}")
   set_target_properties(ocelotgui PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
@@ -501,6 +529,9 @@ endif(Qt6Widgets_FOUND)
 FILE(GLOB jpg_files "${CMAKE_CURRENT_SOURCE_DIR}/*.jpg")
 FILE(GLOB htm_files "${CMAKE_CURRENT_SOURCE_DIR}/*.htm")
 install(TARGETS ocelotgui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if (TMP_OCELOT_PGOPTIONFILES)
+install(TARGETS pgoptionfiles RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif (TMP_OCELOT_PGOPTIONFILES)
 install(FILES ${jpg_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${htm_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES debugger.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -571,29 +602,34 @@ if (NOT PACKAGE_TYPE MATCHES "RPM")
   execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+  execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/pgoptionfiles.1 ${CMAKE_CURRENT_SOURCE_DIR}/pgoptionfiles.1.bak)
+  execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/pgoptionfiles.1)
+  execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/pgoptionfiles.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/pgoptionfiles.1)
+  install(FILES pgoptionfiles.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (NOT PACKAGE_TYPE MATCHES "RPM")
 endif (NOT PACKAGE_TYPE MATCHES "DEB")
 
 if (PACKAGE_TYPE MATCHES "DEB")
   install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+  install(FILES pgoptionfiles.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (PACKAGE_TYPE MATCHES "DEB")
 
 if (PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+  install(FILES pgoptionfiles.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (PACKAGE_TYPE MATCHES "RPM")
 
-# version = 2.5.0
+# version = 2.6.0
 set(CPACK_PACKAGE_VERSION_MAJOR "2")
-set(CPACK_PACKAGE_VERSION_MINOR "5")
+set(CPACK_PACKAGE_VERSION_MINOR "6")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 
-# I assume nobody wants package names like ocelotgui_2.5.0-Linux.deb
+# I assume nobody wants package names like ocelotgui_2.6.0-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer ocelotgui_2.5.0-1_amd64.deb or ocelotgui-2.5.0.x86_64.rpm
+# I'd prefer ocelotgui_2.6.0-1_amd64.deb or ocelotgui-2.6.0.x86_64.rpm
 # If it's neither "DEB" nor "RPM", = default.
 set(FILENAME_PLATFORM_FOR_DEB "Linux")
 set(FILENAME_PLATFORM_FOR_RPM "Linux")
-string(TOLOWER "${CMAKE_SYSTEM_NAME}" cmake_system_name_lower)
 if (cmake_system_name_lower MATCHES "linux")
   find_program(DPKG_CMD dpkg)
   if (DPKG_CMD)

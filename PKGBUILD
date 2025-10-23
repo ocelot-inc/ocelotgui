@@ -31,7 +31,7 @@
 #               Otherwise if running makepkg a second time it may be necessary to say makepkg -f
 #Re cmake:      This is an out-of-source build and produces a RelWithDebInfo executable with an -O2 flag.
 #               For other options read CMakeLists.txt.
-#Re version:    In fact all the source files now are for version 2.5.0 but leaving pkgver=1.7.0 might save hassle.
+#Re version:    In fact all the source files now are for version 2.6.0 but leaving pkgver=1.7.0 might save hassle.
 pkgname=ocelotgui
 pkgver=1.7.0
 pkgrel=1
