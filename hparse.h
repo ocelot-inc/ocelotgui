@@ -11694,38 +11694,44 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     hparse_f_is_global_or_persist(&global_seen, &persist_seen);
     if ((persist_seen == false) && (equal_seen == false))
-    {if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRANSACTION") == 1)
     {
-      bool isolation_seen= false, read_seen= false;
-      do
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTHORIZATION") == 1)
       {
-        if ((isolation_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ISOLATION") == 1))
+        if (hparse_f_user_or_role_name(TOKEN_REFTYPE_USER) == 0) hparse_f_error();
+        return;
+      }
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRANSACTION") == 1)
+      {
+        bool isolation_seen= false, read_seen= false;
+        do
         {
-          isolation_seen= true;
-          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEVEL");
-          if (hparse_errno > 0) return;
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPEATABLE") == 1)
+          if ((isolation_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ISOLATION") == 1))
           {
-            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ");
+            isolation_seen= true;
+            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEVEL");
+            if (hparse_errno > 0) return;
+            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPEATABLE") == 1)
+            {
+              hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ");
+              if (hparse_errno > 0) return;
+            }
+            else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ") == 1)
+            {
+              if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COMMITTED") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNCOMMITTED");
+              if (hparse_errno > 0) return;
+            }
+            else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERIALIZABLE");
             if (hparse_errno > 0) return;
           }
-          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ") == 1)
+          else if ((read_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ") == 1))
           {
-            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COMMITTED") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNCOMMITTED");
+            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WRITE") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLY");
             if (hparse_errno > 0) return;
           }
-          else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERIALIZABLE");
-          if (hparse_errno > 0) return;
-        }
-        else if ((read_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ") == 1))
-        {
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WRITE") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLY");
-          if (hparse_errno > 0) return;
-        }
-        else hparse_f_error();
-      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-      return;
-    }
+          else hparse_f_error();
+        } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        return;
+      }
     }
     if ((global_seen == false) && (persist_seen == false) && (equal_seen == false))
     {if (hparse_f_character_set() == 1)
