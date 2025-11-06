@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.6.0
-   Last modified: October 31 2025
+   Last modified: November 6 2025
 */
 /*
   Copyright (c) 2025 by Peter Gulutzan. All rights reserved.
@@ -14512,7 +14512,7 @@ ok_return:
     QString hparse_s= hparse_token;
     if (hparse_s.left(1) == "\"") hparse_s= hparse_s.right(hparse_s.size() - 1);
     if (hparse_s.left(1) == "`") hparse_s= hparse_s.right(hparse_s.size() - 1);
-    completer_widget->append_wrapper(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, desired_types);
+    completer_widget->append_wrapper(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, desired_types, 0);
     //tmp_word.append(column_value_list.at(i));
     //tmp_word.append(" ");
   }
@@ -21100,6 +21100,7 @@ void Completer_widget::construct(MainWindow *m)
   string_list= QStringList();        /* Qt default constructors create empty lists but I worry anyway. */
   string_list_tooltips= QStringList();
   token_type_list= QList<int> ();
+  flag_version_list= QList<unsigned int> ();
   setReadOnly(true);
   QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timer_expired(void)));
 }
@@ -21325,6 +21326,7 @@ void Completer_widget::clear_wrapper()
   string_list.clear();
   string_list_tooltips.clear();
   token_type_list.clear();
+  flag_version_list.clear();
   current_row= 0;
   hide_wrapper();
 }
@@ -21501,9 +21503,9 @@ void Completer_widget::size_and_position_change()
   todo: we must pass type() but we don't need icon (or, we need icon)
   todo: don't sort string_list, but you could insert to string_list and string_list_tooltips in order
 */
-void Completer_widget::append_wrapper(QString token, QString hparse_token, int token_type, int flags, QString final_letter)
+void Completer_widget::append_wrapper(QString token, QString hparse_token, int token_type, unsigned int token_flags, QString final_letter, unsigned int flag_version)
 {
-  (void) flags; /* suppress "unused parameter" warning */
+  (void) token_flags; /* suppress "unused parameter" warning */
   QString s_hparse_token= hparse_token;
   if (s_hparse_token.left(1) == "\"") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
   if (s_hparse_token.left(1) == "`") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
@@ -21513,6 +21515,7 @@ void Completer_widget::append_wrapper(QString token, QString hparse_token, int t
     string_list.append(token);
     string_list_tooltips.append(final_letter);
     token_type_list.append(token_type);
+    flag_version_list.append(flag_version);
   }
   if (s_hparse_token > "")
   {
@@ -21525,6 +21528,7 @@ void Completer_widget::append_wrapper(QString token, QString hparse_token, int t
         string_list.removeAt(i);
         string_list_tooltips.removeAt(i);
         token_type_list.removeAt(i);
+        flag_version_list.removeAt(i);
       }
     }
   }
@@ -21587,6 +21591,8 @@ void Completer_widget::set_current_row(int new_current_row)
       else if (s2 == "t") s= s + "a Trigger name.";
       else if (s2 == "V") s= s + "a Variable. name.";
       else s= s + "a (" + s2 + ") token.";
+      QString version_flag_string= main_window->hparse_f_version_flag_to_string(flag_version_list.at(new_current_row));
+      if (version_flag_string != "") s= s + "\n" + version_flag_string;
       setToolTip(s);
     }
   }
@@ -24376,7 +24382,7 @@ void Context_menu::menu_context_t_2_explorer(const QPoint & pos)
       QString visible_text= replacer(cmi[i_of_cmi].text);
       visible_text= visible_text + spacer.repeated(max_visible_text_length - visible_text.length());
       visible_text= visible_text + " " + cmi[i_of_cmi].shortcut;
-      q->result_grid->copy_of_parent->c_widget->append_wrapper(visible_text, "", TOKEN_TYPE_IDENTIFIER, TOKEN_FLAG_IS_NEW, "K");
+      q->result_grid->copy_of_parent->c_widget->append_wrapper(visible_text, "", TOKEN_TYPE_IDENTIFIER, TOKEN_FLAG_IS_NEW, "K", 0);
     }
   }
 
@@ -30537,7 +30543,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
       if (token.left(1) == "`") token= token.right(token.size() - 1);
       if (token.right(1) == "`") token= token.left(token.size() - 1);
       token= token.toUpper();
-      completer_widget->append_wrapper(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "V");
+      completer_widget->append_wrapper(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "V", 0);
     }
   }
 }

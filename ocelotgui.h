@@ -198,6 +198,7 @@ typedef struct
   Note: If MySQL/MariaDB share values with Tarantool:
         So we have to distinguish by checking what's being connected as well as what flag value matches.
         For example in hparse.h we say things like "if ((hparse_dbms_mask & flag_version) == 0) return 0;"
+  Note: hparse_f_flag_version_to_string() depends on all values here so if you add/remove here, add/remove there
 */
 #define FLAG_VERSION_MYSQL_5_5      0x00000001
 #define FLAG_VERSION_MYSQL_5_6      0x00000001
@@ -5585,7 +5586,7 @@ public:
   /* void hparse_f_expected_initialize(); Removed 2024-07-23 */
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
-  void hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type);
+  void hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type, unsigned int flag_version);
   void hparse_f_expected_append_endquote(QString token);
   QString hparse_f_token_to_appendee(QString,int,char);
   int hparse_f_expect(unsigned int,unsigned char,int,QString);
@@ -5802,6 +5803,7 @@ public:
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
   void hparse_f_variables_append(int i_of_statement_start, QString text, unsigned char reftype);
+  QString hparse_f_version_flag_to_string(unsigned int);
   void log(const char*,int);
   void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
@@ -6659,6 +6661,7 @@ private:
   QStringList string_list_tooltips;
   int current_row;
   QList<int> token_type_list;
+  QList<unsigned int> flag_version_list;
 void copy_string_list();
 void show_wrapper();
 void set_current_row(int);
@@ -6685,7 +6688,7 @@ void clear_wrapper();
 int count_wrapper();
 QString get_selected_item(QString *tool_tip);
 void size_and_position_change();
-void append_wrapper(QString token, QString hparse_token, int token_type, int flags, QString final_letter);
+void append_wrapper(QString token, QString hparse_token, int token_type, unsigned int token_flags, QString final_letter, unsigned int flag_version);
 bool key_up_or_down(int);
 void updater();
 void timer_reset();

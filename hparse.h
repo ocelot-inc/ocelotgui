@@ -396,7 +396,7 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
     ++hparse_count_of_accepts;
     return 1;
   }
-  hparse_f_expected_append(token, reftype, proposed_type);
+  hparse_f_expected_append(token, reftype, proposed_type, flag_version);
   return 0;
 }
 
@@ -481,7 +481,7 @@ int MainWindow::hparse_f_expected_exact(int reftype)
 /*
   But do not append ; if prev was ; -- a kludge of a kludge, as in hparse_f_create_package() .
 */
-void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type)
+void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type, unsigned int flag_version)
 {
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected.append(hparse_f_token_to_appendee(token, hparse_i, reftype));
@@ -530,8 +530,8 @@ void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, 
     if (token != "[identifier]") return;
   }
   /* This was passing main_token_types[hparse_i], which would be the type of the unfinished input */
-  if (proposed_type == TOKEN_TYPE_OPERATOR)   completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "O");
-  else completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "K");
+  if (proposed_type == TOKEN_TYPE_OPERATOR)   completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "O", 0);
+  else completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "K", flag_version);
 }
 
 /*
@@ -544,7 +544,7 @@ void MainWindow::hparse_f_expected_append_endquote(QString token)
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected= token;
   completer_widget->clear_wrapper();
-  completer_widget->append_wrapper(token, "", TOKEN_TYPE_OPERATOR, TOKEN_REFTYPE_ANY, "K");
+  completer_widget->append_wrapper(token, "", TOKEN_TYPE_OPERATOR, TOKEN_REFTYPE_ANY, "K", 0);
 }
 
 /*
@@ -577,7 +577,7 @@ int MainWindow::hparse_f_acceptn(int proposed_type, QString token, int n)
     hparse_f_nexttoken();
     return 1;
   }
-  hparse_f_expected_append(token, 0, TOKEN_TYPE_KEYWORD);
+  hparse_f_expected_append(token, 0, TOKEN_TYPE_KEYWORD, 0);
   return 0;
 }
 
@@ -2169,6 +2169,8 @@ void MainWindow::hparse_f_portion(int who_is_calling)
      hparse_f_opr_1(who_is_calling, 0);
    }
 }
+
+
 
 /*
   Operators, in order of precedence as in
@@ -5788,7 +5790,7 @@ void MainWindow::hparse_f_for_channel(unsigned int flag_version)
   if (hparse_f_accept(flag_version, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR"))
   {
     hparse_f_expect(flag_version, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHANNEL");
-    if (hparse_errno > 0) return;  
+    if (hparse_errno > 0) return;
     if (hparse_f_literal(TOKEN_REFTYPE_CHANNEL, flag_version, TOKEN_LITERAL_FLAG_STRING) == 0)
     {
       hparse_f_expect(flag_version, TOKEN_REFTYPE_CHANNEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -10268,23 +10270,30 @@ void MainWindow::hparse_f_statement(int block_top)
         hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INSERT") == 1)
+      for (;;) /* CREATE TRIGGER event = INSERT | UPDATE | DELETE. In MariaDB 12.0 they can be ORed. */
       {
-        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1)
-      {
-        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF") == 1)
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INSERT") == 1)
         {
-          do
-          {
-            hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-            if (hparse_errno > 0) return;
-          } while (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+          main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
         }
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1)
+        { /* Actually I don't know when MariaDB started allowing UPDATE OF, I'll guess 10_0 */
+          if (hparse_f_accept(FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF") == 1)
+          {
+            do
+            {
+              hparse_f_expect(FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_0, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+              if (hparse_errno > 0) return;
+            } while (hparse_f_accept(FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+          }
+        }
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DELETE") == 1) {;}
+        else hparse_f_error();
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+        if (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OR, "OR") == 1) continue;
+#endif
+        break;
       }
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DELETE") == 1) {;}
-      else hparse_f_error();
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
       if (hparse_errno > 0) return;
@@ -15769,6 +15778,63 @@ int MainWindow::hparse_f_client_statement()
     return 0; /* not client statement */
   }
   return 1; /* client statement but not SET */
+}
+
+/*
+  Pass: version_flag e.g. FLAG_MARIADB_12_0
+  Return: version_flag_as_string e.g. "MariaDB 12.0"
+  Called from Completer_widget::set_current_row i.e. currently it's only used for a tooltip
+  Not dependable
+*/
+QString MainWindow::hparse_f_version_flag_to_string(unsigned int version_flag)
+{
+  QString myv= ""; QString mav= ""; QString tav= "";
+  if ((version_flag & FLAG_VERSION_MYSQL_5_5) != 0) myv= "MySQL 5.5+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_5_6) != 0) myv= "MySQL 5.6+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_5_7) != 0) myv= "MySQL 5.7+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_0) != 0) myv= "MySQL 8.0+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_0_31) != 0) myv= "MySQL 8.0.31+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_1) != 0) myv= "MySQL 8.1+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_2) != 0) myv= "MySQL 8.2+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_3) != 0) myv= "MySQL 8.3+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_8_4) != 0) myv= "MySQL 8.4+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_9_0) != 0) myv= "MySQL 9.0+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_9_1) != 0) myv= "MySQL 9.1+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_9_2) != 0) myv= "MySQL 9.2+ ";
+  else if ((version_flag & FLAG_VERSION_MYSQL_9_3) != 0) myv= "MySQL 9.3+ ";
+  if ((version_flag & FLAG_VERSION_MARIADB_5_5) != 0) mav= "MariaDB 5.5+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_0) != 0) mav= "MariaDB 10_0+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_1) != 0) mav= "MariaDB 10_1+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_2_2) != 0) mav= "MariaDB 10_2_2+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_2_3) != 0) mav= "MariaDB 10_2_3+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_3) != 0) mav= "MariaDB 10_3+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_5) != 0) mav= "MariaDB 10_5+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_6) != 0) mav= "MariaDB 10_6+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_7) != 0) mav= "MariaDB 10_7+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_8) != 0) mav= "MariaDB 10_8+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_9) != 0) mav= "MariaDB 10_9+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_10) != 0) mav= "MariaDB 10_10+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_10_11) != 0) mav= "MariaDB 10_11+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_0) != 0) mav= "MariaDB 11_0+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_1) != 0) mav= "MariaDB 11_1+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_2) != 0) mav= "MariaDB 11_2+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_3) != 0) mav= "MariaDB 11_3+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_4) != 0) mav= "MariaDB 11_4+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_5) != 0) mav= "MariaDB 11_5+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_6) != 0) mav= "MariaDB 11_6+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_7) != 0) mav= "MariaDB 11_7+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_11_8) != 0) mav= "MariaDB 11_8+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_12_0) != 0) mav= "MariaDB 12.0+ ";
+  else if ((version_flag & FLAG_VERSION_MARIADB_12_2) != 0) mav= "MariaDB 12_2+ ";
+  if ((version_flag & FLAG_VERSION_TARANTOOL) != 0) tav= "Tarantool 1.0+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_2) != 0) tav= "Tarantool 2.2+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_3) != 0) tav= "Tarantool 2.3+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_4) != 0) tav= "Tarantool 2.4+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_7) != 0) tav= "Tarantool 2.7+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_10) != 0) tav= "Tarantool 2.10+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_2_11) != 0) tav= "Tarantool 2.11+";
+  else if ((version_flag & FLAG_VERSION_TARANTOOL_3_0) != 0) tav= "Tarantool 3.0+";
+  return myv + mav + tav;
 }
 
 #ifdef DBMS_TARANTOOL
